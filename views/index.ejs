@@ -1,0 +1,46 @@
+<!-- views/index.ejs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yomi Proxy</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body class="public">
+    <main class="container">
+        <h1>Yomi Proxy</h1>
+        <p>This is a public proxy for various AI models. Use the endpoints below with your preferred client.</p>
+
+        <% if (providers.length > 0) { %>
+            <% providers.forEach(provider => { %>
+                <div class="provider-card">
+                    <div class="provider-header">
+                        <h2><%= provider.name.charAt(0).toUpperCase() + provider.name.slice(1) %></h2>
+                    </div>
+                    
+                    <div class="endpoint-wrapper">
+                        <code><%= baseUrl %>/<%= provider.name %></code>
+                    </div>
+
+                    <button class="copy-btn" data-endpoint="<%= baseUrl %>/<%= provider.name %>">Copy</button>
+
+                    <div class="provider-details">
+                        <div><strong>Max Context:</strong> <span><%= provider.maxContext %></span></div>
+                        <div><strong>Max Output:</strong> <span><%= provider.maxOutput %></span></div>
+                    </div>
+                    <div class="provider-keys">
+                        <span class="key-status active">Active: <%= provider.keys.active %></span>
+                        <span class="key-status over-quota">Over Quota: <%= provider.keys.over_quota %></span>
+                        <span class="key-status revoked">Revoked: <%= provider.keys.revoked %></span>
+                    </div>
+                </div>
+            <% }) %>
+        <% } else { %>
+            <p>No providers are currently configured. The administrator needs to add API keys.</p>
+        <% } %>
+    </main>
+
+    <script src="/main.js"></script>
+</body>
+        </html>

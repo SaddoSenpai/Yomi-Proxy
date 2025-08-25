@@ -1,0 +1,148 @@
+// controllers/adminController.js
+// Handles all logic for the admin panel, including auth, stats, structure, and commands.
+
+const statsService = require('../services/statsService');
+const promptService = require('../services/promptService');
+const keyManager = require('../services/keyManager');
+const pool = require('../config/db');
+
+const ADMIN_PASS = process.env.ADMIN_PASS || 'yomi123';
+
+// --- Page Rendering ---
+exports.renderLoginPage = (req, res) => res.render('admin-login');
+exports.renderDashboard = (req, res) => {
+    const availableProviders = keyManager.getAvailableProviders();
+    res.render('admin', { availableProviders });
+};
+
+// --- Authentication ---
+exports.handleLogin = (req, res) => {
+    const { password } = req.body;
+    if (password === ADMIN_PASS) {
+        req.session.isAdmin = true;
+        res.redirect('/admin/dashboard');
+    } else {
+        res.status(401).send('Incorrect password');
+    }
+};
+exports.handleLogout = (req, res) => {
+    req.session.destroy(() => res.redirect('/admin'));
+};
+
+// --- API: Stats ---
+exports.getStats = (req, res) => res.json(statsService.getStats());
+
+// --- API: Structure ---
+exports.getStructure = async (req, res) => {
+    try {
+        const provider = req.query.provider || 'default';
+        const structure = await promptService.getStructure(provider);
+        res.json({ blocks: structure });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch structure.' });
+    }
+};
+exports.updateStructure = async (req, res) => {
+    try {
+        const provider = req.query.provider || 'default';
+        const { blocks } = req.body;
+        if (!Array.isArray(blocks)) return res.status(400).json({ error: 'blocks array is required' });
+        await promptService.setStructure(provider, blocks);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update structure.' });
+    }
+};
+
+// --- API: Commands ---
+exports.getCommands = async (req, res) => {
+    try {
+        const commands = await promptService.getCommands();
+        res.json({ commands });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch commands.' });
+    }
+};
+exports.saveCommand = async (req, res) => {
+    try {
+        await promptService.saveCommand(req.body);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to save command.' });
+    }
+};
+exports.deleteCommand = async (req, res) => {
+    try {
+        await promptService.deleteCommand(req.params.id);
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete command.' });
+    }
+};
+
+// --- API: Import/Export ---
+exports.exportData = async (req, res) => {
+    try {
+        const provider = req.query.provider || 'default';
+        const structure = await promptService.getStructure(provider);
+        const commands = await promptService.getCommands();
+        const exportData = {
+            provider,
+            structure,
+            commands
+        };
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', `attachment; filename="yomi_proxy_config_${provider}.json"`);
+        res.json(exportData);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to export data.' });
+    }
+};
+
+exports.importData = async (req, res) => {
+    if (!req.files || !req.files.configFile) {
+        return res.status(400).json({ error: 'No file uploaded.' });
+    }
+    const client = await pool.connect();
+    try {
+        const file = req.files.configFile;
+        const importData = JSON.parse(file.data.toString('utf8'));
+        const { provider, structure, commands } = importData;
+
+        if (!provider || !Array.isArray(structure) || !Array.isArray(commands)) {
+            throw new Error('Invalid import file format.');
+        }
+
+        await client.query('BEGIN');
+        // Import structure
+        await client.query('DELETE FROM global_prompt_blocks WHERE provider = $1', [provider]);
+        for (let i = 0; i < structure.length; i++) {
+            const block = structure[i];
+            await client.query(
+                'INSERT INTO global_prompt_blocks (provider, name, role, content, position, is_enabled, block_type) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+                [provider, block.name, block.role, block.content, i, block.is_enabled, block.block_type]
+            );
+        }
+        // Import commands (UPSERT logic)
+        for (const cmd of commands) {
+            await client.query(
+                `INSERT INTO commands (command_tag, block_name, block_role, block_content, command_type)
+                 VALUES ($1, $2, $3, $4, $5)
+                 ON CONFLICT (command_tag) DO UPDATE SET
+                    block_name = EXCLUDED.block_name,
+                    block_role = EXCLUDED.block_role,
+                    block_content = EXCLUDED.block_content,
+                    command_type = EXCLUDED.command_type,
+                    updated_at = NOW()`,
+                [cmd.command_tag.toUpperCase(), cmd.block_name, cmd.block_role, cmd.block_content, cmd.command_type]
+            );
+        }
+        await client.query('COMMIT');
+        res.json({ success: true, message: `Successfully imported config for ${provider}.` });
+    } catch (error) {
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: 'Import failed.', detail: error.message });
+    } finally {
+        client.release();
+    }
+};

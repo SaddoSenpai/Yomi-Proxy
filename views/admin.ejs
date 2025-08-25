@@ -1,0 +1,174 @@
+<!-- views/admin.ejs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Yomi Proxy</title>
+    <link rel="stylesheet" href="/admin-style.css">
+    <!-- Boxicons for icons -->
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+</head>
+<body>
+    <!-- NEW: Overlay for mobile sidebar -->
+    <div class="overlay"></div>
+
+    <div class="sidebar">
+        <div class="logo-details">
+            <i class='bx bxs-zap'></i>
+            <span class="logo_name">Yomi Proxy</span>
+        </div>
+        <ul class="nav-links">
+            <li>
+                <a href="#" class="nav-link active" data-tab="dashboard">
+                    <i class='bx bx-grid-alt'></i>
+                    <span class="link_name">Dashboard</span>
+                </a>
+            </li>
+            <li>
+                <a href="#" class="nav-link" data-tab="structure">
+                    <i class='bx bx-list-ul'></i>
+                    <span class="link_name">Structure</span>
+                </a>
+            </li>
+            <li>
+                <a href="#" class="nav-link" data-tab="commands">
+                    <i class='bx bx-terminal'></i>
+                    <span class="link_name">Commands</span>
+                </a>
+            </li>
+            <li>
+                <a href="#" class="nav-link" data-tab="import-export">
+                    <i class='bx bx-transfer-alt'></i>
+                    <span class="link_name">Import/Export</span>
+                </a>
+            </li>
+            <li class="logout-link">
+                <a href="/admin/logout">
+                    <i class='bx bx-log-out'></i>
+                    <span class="link_name">Logout</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <section class="home-section">
+        <nav class="header-nav">
+            <div class="sidebar-button">
+                <i class='bx bx-menu sidebarBtn'></i>
+                <span class="dashboard-title">Dashboard</span>
+            </div>
+        </nav>
+
+        <div class="home-content">
+            <!-- Dashboard Tab -->
+            <div id="dashboard" class="tab-content active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Total Prompts</h3>
+                        <p id="stat-prompts">Loading...</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Input Tokens</h3>
+                        <p id="stat-input-tokens">Loading...</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Output Tokens</h3>
+                        <p id="stat-output-tokens">Loading...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Structure Tab -->
+            <div id="structure" class="tab-content">
+                <div class="content-header">
+                    <h2>Global Prompt Structure</h2>
+                    <div class="controls">
+                        <label for="providerSelector">Provider:</label>
+                        <select id="providerSelector">
+                            <option value="default">Default (Fallback)</option>
+                            <% availableProviders.forEach(p => { %>
+                                <option value="<%= p %>"><%= p.charAt(0).toUpperCase() + p.slice(1) %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                </div>
+                <p class="muted">Define the prompt structure for all requests. Use <code>&lt;&lt;CHAT_HISTORY&gt;&gt;</code> as a placeholder.</p>
+                <div id="blocksList"></div>
+                <div class="action-buttons">
+                    <button id="addBlockBtn" class="btn-secondary">Add Block</button>
+                    <button id="saveStructureBtn" class="btn-primary">Save Structure</button>
+                </div>
+            </div>
+
+            <!-- Commands Tab -->
+            <div id="commands" class="tab-content">
+                <div class="content-header">
+                    <h2>Command Manager</h2>
+                </div>
+                <p class="muted">Define commands that inject blocks into the prompt structure.</p>
+                <div class="command-editor">
+                    <div class="command-list-wrapper">
+                        <h3>Existing Commands</h3>
+                        <div id="commandsList"></div>
+                    </div>
+                    <div class="command-form-wrapper">
+                        <h3 id="command-form-title">Add New Command</h3>
+                        <form id="command-form">
+                            <input type="hidden" id="cmd_id">
+                            <input id="cmd_tag" placeholder="COMMAND_TAG (e.g., JAILBREAK)" required>
+                            <input id="cmd_name" placeholder="Block Name (e.g., 'JB v4')" required>
+                            <select id="cmd_role">
+                                <option value="system">system</option>
+                                <option value="user">user</option>
+                                <option value="assistant">assistant</option>
+                            </select>
+                            <select id="cmd_type">
+                                <option value="Jailbreak">Jailbreak</option>
+                                <option value="Additional Commands">Additional Commands</option>
+                                <option value="Prefill">Prefill</option>
+                            </select>
+                            <textarea id="cmd_content" placeholder="Content to be injected..."></textarea>
+                            <div class="action-buttons">
+                                <button type="button" id="cmd_clear_btn" class="btn-secondary">Clear Form</button>
+                                <button type="submit" class="btn-primary">Save Command</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Import/Export Tab -->
+            <div id="import-export" class="tab-content">
+                <div class="content-header">
+                    <h2>Import / Export</h2>
+                </div>
+                <div class="io-grid">
+                    <div class="io-card">
+                        <h3>Export Configuration</h3>
+                        <p class="muted">Export the structure and commands for a specific provider as a JSON file.</p>
+                        <div class="controls">
+                            <label for="exportProviderSelector">Provider:</label>
+                            <select id="exportProviderSelector">
+                                <option value="default">Default (Fallback)</option>
+                                <% availableProviders.forEach(p => { %>
+                                    <option value="<%= p %>"><%= p.charAt(0).toUpperCase() + p.slice(1) %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <button id="exportBtn" class="btn-primary">Export</button>
+                    </div>
+                    <div class="io-card">
+                        <h3>Import Configuration</h3>
+                        <p class="muted">Import a JSON file to overwrite a provider's structure and add/update commands.</p>
+                        <input type="file" id="importFile" accept=".json">
+                        <button id="importBtn" class="btn-primary">Import</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <script src="/admin.js"></script>
+</body>
+</html>

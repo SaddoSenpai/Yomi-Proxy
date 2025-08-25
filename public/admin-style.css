@@ -1,0 +1,316 @@
+/* public/admin-style.css */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --bg-dark: #12171e;
+    --bg-card: #1d242e;
+    --accent-primary: #f558a2;
+    --text-light: #E4E9F7;
+    --text-muted: #a0a8b6;
+    --border-color: #3a4250;
+    --green: #28a745;
+    --orange: #ffae57;
+    --red: #dc3545;
+    --blue: #3e64ff;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Poppins', sans-serif;
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-light);
+    position: relative;
+    min-height: 100vh;
+}
+
+/* --- MODIFIED: Overlay for mobile sidebar --- */
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+.overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 260px;
+    background: var(--bg-card);
+    z-index: 1000; /* Sidebar is on top of overlay */
+    transition: all 0.5s ease;
+}
+.sidebar.close { width: 78px; }
+.sidebar .logo-details {
+    height: 60px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+}
+.sidebar .logo-details i {
+    font-size: 30px;
+    color: var(--accent-primary);
+    height: 50px;
+    min-width: 78px;
+    text-align: center;
+    line-height: 50px;
+}
+.sidebar .logo-details .logo_name {
+    font-size: 22px;
+    color: var(--text-light);
+    font-weight: 600;
+    transition: 0.3s ease;
+    transition-delay: 0.1s;
+}
+.sidebar.close .logo-details .logo_name {
+    transition-delay: 0s;
+    opacity: 0;
+    pointer-events: none;
+}
+.sidebar .nav-links {
+    height: 100%;
+    padding: 30px 0 150px 0;
+    overflow: auto;
+}
+.sidebar.close .nav-links { overflow: visible; }
+.sidebar .nav-links::-webkit-scrollbar { display: none; }
+.sidebar .nav-links li {
+    position: relative;
+    list-style: none;
+    transition: all 0.4s ease;
+}
+.sidebar .nav-links li:hover { background: var(--bg-dark); }
+.sidebar .nav-links li a {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+}
+.sidebar .nav-links li a .link_name {
+    font-size: 18px;
+    font-weight: 400;
+    color: var(--text-light);
+    transition: all 0.4s ease;
+}
+.sidebar.close .nav-links li a .link_name { opacity: 0; pointer-events: none; }
+.sidebar .nav-links li i {
+    height: 50px;
+    min-width: 78px;
+    text-align: center;
+    line-height: 50px;
+    color: var(--text-muted);
+    font-size: 20px;
+    transition: all 0.3s ease;
+}
+.sidebar .nav-links li a.active i, .sidebar .nav-links li:hover a i { color: var(--accent-primary); }
+.sidebar .nav-links li a.active .link_name { color: var(--accent-primary); }
+.sidebar .logout-link {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+}
+
+.home-section {
+    position: relative;
+    background: var(--bg-dark);
+    min-height: 100vh;
+    left: 260px;
+    width: calc(100% - 260px);
+    transition: all 0.5s ease;
+    padding: 20px;
+}
+.sidebar.close ~ .home-section {
+    left: 78px;
+    width: calc(100% - 78px);
+}
+.home-section .header-nav {
+    height: 60px;
+    display: flex;
+    align-items: center;
+}
+.home-section .header-nav .sidebar-button {
+    display: flex;
+    align-items: center;
+    font-size: 24px;
+    font-weight: 500;
+    color: var(--text-light);
+}
+.header-nav .sidebar-button i {
+    font-size: 35px;
+    margin-right: 10px;
+    cursor: pointer;
+}
+.home-content {
+    padding-top: 20px;
+}
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Admin Content Styles */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+.stat-card { background-color: var(--bg-card); padding: 25px; border-radius: 12px; }
+.stat-card h3 { margin-top: 0; color: var(--text-muted); font-weight: 500; }
+.stat-card p { font-size: 2.5em; font-weight: 600; margin: 0; color: var(--accent-primary); }
+
+.content-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+.content-header h2 { border: none; color: var(--text-light); }
+.controls { display: flex; align-items: center; gap: 10px; }
+p.muted { color: var(--text-muted); margin-bottom: 20px; }
+
+input, select, textarea {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-dark);
+    color: var(--text-light);
+    font-size: 1em;
+    box-sizing: border-box;
+}
+.action-buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+}
+button.btn-primary { background-color: var(--blue); color: white; }
+button.btn-secondary { background-color: var(--border-color); color: var(--text-light); }
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background-color: var(--border-color) !important;
+}
+
+/* --- MODIFIED: New Structure Editor Styles --- */
+.block-item {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 8px;
+    border-left: 4px solid transparent;
+    transition: border-color 0.3s;
+}
+.block-item.is-injection-point {
+    border-left-color: var(--orange);
+}
+.block-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.block-info {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+.block-name {
+    font-weight: 600;
+    line-height: 1.2;
+}
+.block-role, .block-type-label {
+    color: var(--text-muted);
+    font-size: 0.8em;
+}
+.block-actions {
+    display: flex;
+    flex-direction: column; /* Stack buttons vertically */
+    gap: 8px;
+}
+.block-actions button {
+    font-size: 0.9em;
+    padding: 5px 10px;
+    width: 80px; /* Give buttons a fixed width */
+    text-align: center;
+}
+.block-editor {
+    display: none;
+    margin-top: 15px;
+    border-top: 1px solid var(--border-color);
+    padding-top: 15px;
+}
+.block-item.is-editing .block-editor {
+    display: block;
+}
+.block-editor-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+.block-editor textarea {
+    min-height: 150px;
+    font-family: monospace;
+    margin-top: 15px;
+}
+.block-editor textarea:disabled {
+    background-color: #2a313c;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+.block-editor .action-buttons {
+    margin-top: 0;
+}
+
+/* Command Editor Styles */
+.command-editor { display: grid; grid-template-columns: 1fr; gap: 20px; } /* Stack on mobile */
+.command-list-wrapper, .command-form-wrapper { background-color: var(--bg-card); padding: 20px; border-radius: 12px; }
+#commandsList { max-height: 400px; overflow-y: auto; }
+.command-item { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+.command-item .cmd-info { font-size: 0.9em; }
+.command-item .cmd-info code { color: var(--orange); }
+.command-item .cmd-actions button { font-size: 0.8em; padding: 4px 8px; margin-left: 5px; }
+
+/* Import/Export Styles */
+.io-grid { display: grid; grid-template-columns: 1fr; gap: 20px; } /* Stack on mobile */
+.io-card { background-color: var(--bg-card); padding: 25px; border-radius: 12px; }
+#importFile { padding: 5px; }
+
+/* --- MODIFIED: Mobile Responsive Styles --- */
+@media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(-100%); /* Hide sidebar off-screen */
+        width: 260px; /* Keep width consistent */
+    }
+    .sidebar.open {
+        transform: translateX(0); /* Slide sidebar in */
+    }
+    .sidebar.close {
+        transform: translateX(-100%); /* Ensure it's hidden when 'close' is toggled */
+        width: 260px;
+    }
+    .home-section {
+        width: 100%;
+        left: 0;
+    }
+    .sidebar.close ~ .home-section {
+        width: 100%;
+        left: 0;
+    }
+    .command-editor, .io-grid {
+        grid-template-columns: 1fr; /* Ensure single column layout */
+    }
+}
+
+@media (min-width: 769px) {
+    .command-editor, .io-grid {
+        grid-template-columns: 1fr 1fr; /* Two columns on desktop */
+    }
+}

@@ -1,0 +1,19 @@
+<!-- views/admin-login.ejs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - Yomi Proxy</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <main class="container login-container">
+        <h1>Admin Login</h1>
+        <form action="/admin/login" method="POST">
+            <input type="password" name="password" placeholder="Enter Admin Password" required>
+            <button type="submit">Login</button>
+        </form>
+    </main>
+</body>
+</html>
