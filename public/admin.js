@@ -5,27 +5,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const navLinks = document.querySelectorAll('.nav-link');
     const tabContents = document.querySelectorAll('.tab-content');
     const dashboardTitle = document.querySelector('.dashboard-title');
-    const overlay = document.querySelector('.overlay'); // Get the overlay
+    const overlay = document.querySelector('.overlay');
 
-    // --- MODIFIED: Implement sliding sidebar logic for mobile view ---
     sidebarBtn.addEventListener('click', () => {
         if (window.innerWidth <= 768) {
-            // On mobile, toggle the 'open' class for sliding
             sidebar.classList.toggle('open');
             overlay.classList.toggle('active');
         } else {
-            // On desktop, toggle the 'close' class for collapsing
             sidebar.classList.toggle('close');
         }
     });
 
-    // Close mobile sidebar when overlay is clicked
     overlay.addEventListener('click', () => {
         sidebar.classList.remove('open');
         overlay.classList.remove('active');
     });
 
-    // --- Navigation ---
     navLinks.forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
@@ -38,7 +33,6 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById(tabId).classList.add('active');
             dashboardTitle.textContent = link.querySelector('.link_name').textContent;
 
-            // Close sidebar after clicking a link on mobile
             if (window.innerWidth <= 768) {
                 sidebar.classList.remove('open');
                 overlay.classList.remove('active');
@@ -46,7 +40,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // --- API Helper ---
     async function api(path, opts = {}) {
         const response = await fetch('/admin/api' + path, opts);
         if (!response.ok) {
@@ -54,6 +47,20 @@ document.addEventListener('DOMContentLoaded', () => {
             throw new Error(error.detail || error.error || 'API request failed');
         }
         return response.status === 204 ? null : response.json();
+    }
+
+    // --- Helper function for copying text ---
+    window.copyToClipboard = (text, button) => {
+        navigator.clipboard.writeText(text).then(() => {
+            const originalText = button.textContent;
+            button.textContent = 'Copied!';
+            setTimeout(() => {
+                button.textContent = originalText;
+            }, 2000);
+        }).catch(err => {
+            console.error('Failed to copy text: ', err);
+            alert('Could not copy text.');
+        });
     }
 
     // --- Dashboard Stats ---
@@ -188,10 +195,10 @@ document.addEventListener('DOMContentLoaded', () => {
     providerSelector.onchange = () => fetchStructure(providerSelector.value);
     fetchStructure(providerSelector.value);
 
-    // --- Command Editor (Unchanged) ---
+    // --- Command Editor ---
     const commandsList = document.getElementById('commandsList');
     const commandForm = document.getElementById('command-form');
-    const formTitle = document.getElementById('command-form-title');
+    const commandFormTitle = document.getElementById('command-form-title');
     let allCommands = [];
 
     async function fetchCommands() {
@@ -211,17 +218,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     <strong><code>&lt;${cmd.command_tag}&gt;</code></strong> - ${cmd.block_name} (${cmd.command_type})
                 </div>
                 <div class="cmd-actions">
-                    <button class="btn-secondary" data-id="${cmd.id}" onclick="editCommand(this)">Edit</button>
-                    <button class="btn-secondary" data-id="${cmd.id}" onclick="deleteCommand(this)">Delete</button>
+                    <button class="btn-secondary" onclick="editCommand(${cmd.id})">Edit</button>
+                    <button class="btn-secondary" onclick="deleteCommand(${cmd.id})">Delete</button>
                 </div>
             </div>
         `).join('');
     }
 
-    window.editCommand = (btn) => {
-        const cmd = allCommands.find(c => c.id == btn.dataset.id);
+    window.editCommand = (id) => {
+        const cmd = allCommands.find(c => c.id == id);
         if (!cmd) return;
-        formTitle.textContent = 'Edit Command';
+        commandFormTitle.textContent = 'Edit Command';
         document.getElementById('cmd_id').value = cmd.id;
         document.getElementById('cmd_tag').value = cmd.command_tag;
         document.getElementById('cmd_name').value = cmd.block_name;
@@ -230,10 +237,10 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('cmd_content').value = cmd.block_content;
     };
 
-    window.deleteCommand = async (btn) => {
+    window.deleteCommand = async (id) => {
         if (!confirm('Are you sure you want to delete this command?')) return;
         try {
-            await api(`/commands/${btn.dataset.id}`, { method: 'DELETE' });
+            await api(`/commands/${id}`, { method: 'DELETE' });
             fetchCommands();
         } catch (error) {
             alert('Error deleting command: ' + error.message);
@@ -241,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     document.getElementById('cmd_clear_btn').onclick = () => {
-        formTitle.textContent = 'Add New Command';
+        commandFormTitle.textContent = 'Add New Command';
         commandForm.reset();
         document.getElementById('cmd_id').value = '';
     };
@@ -270,7 +277,122 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     fetchCommands();
 
-    // --- Import/Export (Unchanged) ---
+    // --- User Token Editor ---
+    const tokensList = document.getElementById('tokensList');
+    const tokenForm = document.getElementById('token-form');
+    const tokenFormTitle = document.getElementById('token-form-title');
+    const regenerateWrapper = document.getElementById('regenerate-wrapper');
+    const existingTokenWrapper = document.getElementById('existing-token-wrapper');
+    const tokenValueDisplay = document.getElementById('token_value_display');
+    let allTokens = [];
+
+    async function fetchTokens() {
+        try {
+            const data = await api('/tokens');
+            allTokens = data.tokens || [];
+            renderTokens();
+        } catch (error) {
+            alert('Error fetching tokens: ' + error.message);
+        }
+    }
+
+    function renderTokens() {
+        tokensList.innerHTML = allTokens.map(token => `
+            <div>
+                <div class="command-item">
+                    <div class="cmd-info">
+                        <strong>${token.name}</strong> - ${token.rpm} RPM
+                        <span style="color: ${token.is_enabled ? 'var(--green)' : 'var(--red)'};">
+                            (${token.is_enabled ? 'Enabled' : 'Disabled'})
+                        </span>
+                    </div>
+                    <div class="cmd-actions">
+                        <button class="btn-secondary" onclick="editToken(${token.id})">Edit</button>
+                        <button class="btn-secondary" onclick="deleteToken(${token.id})">Delete</button>
+                    </div>
+                </div>
+                <div class="token-value-wrapper">
+                    <code>${token.token}</code>
+                    <button class="btn-secondary" onclick="copyToClipboard('${token.token}', this)">Copy</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    window.editToken = (id) => {
+        const token = allTokens.find(t => t.id == id);
+        if (!token) return;
+        tokenFormTitle.textContent = 'Edit Token';
+        document.getElementById('token_id').value = token.id;
+        document.getElementById('token_name').value = token.name;
+        document.getElementById('token_rpm').value = token.rpm;
+        document.getElementById('token_enabled').value = token.is_enabled;
+        
+        tokenValueDisplay.value = token.token;
+        existingTokenWrapper.style.display = 'block';
+
+        regenerateWrapper.style.display = 'block';
+        document.getElementById('token_regenerate').checked = false;
+    };
+
+    window.copyTokenValue = () => {
+        const button = document.querySelector('.btn-copy-token');
+        copyToClipboard(tokenValueDisplay.value, button);
+    };
+
+    window.deleteToken = async (id) => {
+        if (!confirm('Are you sure you want to delete this token? This action is permanent.')) return;
+        try {
+            await api(`/tokens/${id}`, { method: 'DELETE' });
+            fetchTokens();
+        } catch (error) {
+            alert('Error deleting token: ' + error.message);
+        }
+    };
+
+    document.getElementById('token_clear_btn').onclick = () => {
+        tokenFormTitle.textContent = 'Add New Token';
+        tokenForm.reset();
+        document.getElementById('token_id').value = '';
+        regenerateWrapper.style.display = 'none';
+        existingTokenWrapper.style.display = 'none';
+        document.getElementById('token_regenerate').checked = false;
+    };
+
+    tokenForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('token_id').value || null;
+        const body = {
+            id: id,
+            name: document.getElementById('token_name').value,
+            rpm: parseInt(document.getElementById('token_rpm').value, 10),
+            is_enabled: document.getElementById('token_enabled').value === 'true',
+            regenerate: id ? document.getElementById('token_regenerate').checked : false
+        };
+
+        try {
+            const result = await api('/tokens', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            
+            const isNew = !id || body.regenerate;
+            if (isNew) {
+                alert(`Token saved successfully! The new token value is:\n\n${result.token.token}\n\nIt is also visible in the list below.`);
+            } else {
+                alert('Token updated successfully!');
+            }
+
+            document.getElementById('token_clear_btn').click();
+            fetchTokens();
+        } catch (error) {
+            alert('Error saving token: ' + error.message);
+        }
+    };
+    fetchTokens();
+
+    // --- Import/Export ---
     document.getElementById('exportBtn').onclick = () => {
         const provider = document.getElementById('exportProviderSelector').value;
         window.location.href = `/admin/api/export?provider=${provider}`;

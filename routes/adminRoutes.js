@@ -19,12 +19,17 @@ router.get('/api/stats', adminAuth, adminController.getStats);
 router.get('/api/structure', adminAuth, adminController.getStructure);
 router.put('/api/structure', adminAuth, adminController.updateStructure);
 
-// Commands (NEW)
+// Commands
 router.get('/api/commands', adminAuth, adminController.getCommands);
 router.post('/api/commands', adminAuth, adminController.saveCommand);
 router.delete('/api/commands/:id', adminAuth, adminController.deleteCommand);
 
-// Import/Export (NEW)
+// User Tokens (NEW)
+router.get('/api/tokens', adminAuth, adminController.getTokens);
+router.post('/api/tokens', adminAuth, adminController.saveToken);
+router.delete('/api/tokens/:id', adminAuth, adminController.deleteToken);
+
+// Import/Export
 router.post('/api/import', adminAuth, adminController.importData);
 router.get('/api/export', adminAuth, adminController.exportData);
 

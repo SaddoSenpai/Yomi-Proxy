@@ -7,8 +7,9 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const session = require('express-session');
 const fileUpload = require('express-fileupload');
-const cors = require('cors'); // <-- FIX #1: Import the cors package
+const cors = require('cors');
 const keyManager = require('./services/keyManager');
+const tokenManager = require('./services/tokenManager'); // <-- ADDED
 const mainRoutes = require('./routes/mainRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const proxyController = require('./controllers/proxyController');
@@ -28,7 +29,7 @@ app.use((req, res, next) => {
 });
 
 // --- Middleware Setup ---
-app.use(cors()); // <-- FIX #2: Enable CORS for all routes. Place it near the top.
+app.use(cors());
 app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(fileUpload());
@@ -36,6 +37,7 @@ app.set('view engine', 'ejs');
 
 // Define API routes *before* static files
 keyManager.initialize();
+tokenManager.initialize(); // <-- ADDED
 const availableProviders = keyManager.getAvailableProviders();
 console.log('[DEBUG] Providers found by keyManager:', availableProviders);
 

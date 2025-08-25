@@ -28,7 +28,6 @@ body {
     min-height: 100vh;
 }
 
-/* --- MODIFIED: Overlay for mobile sidebar --- */
 .overlay {
     position: fixed;
     top: 0;
@@ -53,7 +52,7 @@ body {
     height: 100%;
     width: 260px;
     background: var(--bg-card);
-    z-index: 1000; /* Sidebar is on top of overlay */
+    z-index: 1000;
     transition: all 0.5s ease;
 }
 .sidebar.close { width: 78px; }
@@ -199,7 +198,6 @@ button:disabled {
     background-color: var(--border-color) !important;
 }
 
-/* --- MODIFIED: New Structure Editor Styles --- */
 .block-item {
     background-color: var(--bg-card);
     border: 1px solid var(--border-color);
@@ -232,13 +230,13 @@ button:disabled {
 }
 .block-actions {
     display: flex;
-    flex-direction: column; /* Stack buttons vertically */
+    flex-direction: column;
     gap: 8px;
 }
 .block-actions button {
     font-size: 0.9em;
     padding: 5px 10px;
-    width: 80px; /* Give buttons a fixed width */
+    width: 80px;
     text-align: center;
 }
 .block-editor {
@@ -270,30 +268,30 @@ button:disabled {
 }
 
 /* Command Editor Styles */
-.command-editor { display: grid; grid-template-columns: 1fr; gap: 20px; } /* Stack on mobile */
+.command-editor { display: grid; grid-template-columns: 1fr; gap: 20px; }
 .command-list-wrapper, .command-form-wrapper { background-color: var(--bg-card); padding: 20px; border-radius: 12px; }
-#commandsList { max-height: 400px; overflow-y: auto; }
+#commandsList, #tokensList { max-height: 400px; overflow-y: auto; }
 .command-item { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
 .command-item .cmd-info { font-size: 0.9em; }
 .command-item .cmd-info code { color: var(--orange); }
 .command-item .cmd-actions button { font-size: 0.8em; padding: 4px 8px; margin-left: 5px; }
 
 /* Import/Export Styles */
-.io-grid { display: grid; grid-template-columns: 1fr; gap: 20px; } /* Stack on mobile */
+.io-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
 .io-card { background-color: var(--bg-card); padding: 25px; border-radius: 12px; }
 #importFile { padding: 5px; }
 
-/* --- MODIFIED: Mobile Responsive Styles --- */
+/* Mobile Responsive Styles */
 @media (max-width: 768px) {
     .sidebar {
-        transform: translateX(-100%); /* Hide sidebar off-screen */
-        width: 260px; /* Keep width consistent */
+        transform: translateX(-100%);
+        width: 260px;
     }
     .sidebar.open {
-        transform: translateX(0); /* Slide sidebar in */
+        transform: translateX(0);
     }
     .sidebar.close {
-        transform: translateX(-100%); /* Ensure it's hidden when 'close' is toggled */
+        transform: translateX(-100%);
         width: 260px;
     }
     .home-section {
@@ -305,12 +303,52 @@ button:disabled {
         left: 0;
     }
     .command-editor, .io-grid {
-        grid-template-columns: 1fr; /* Ensure single column layout */
+        grid-template-columns: 1fr;
     }
 }
 
 @media (min-width: 769px) {
     .command-editor, .io-grid {
-        grid-template-columns: 1fr 1fr; /* Two columns on desktop */
+        grid-template-columns: 1fr 1fr;
     }
+}
+
+/* NEW: Token Editor Styles */
+.input-with-copy {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+.input-with-copy input {
+    margin-bottom: 0;
+    background-color: #2a313c;
+    cursor: text;
+}
+.input-with-copy .btn-copy-token {
+    padding: 10px;
+    flex-shrink: 0;
+    background-color: var(--border-color);
+    color: var(--text-light);
+}
+.token-value-wrapper {
+    margin-top: 10px;
+    margin-bottom: 15px; /* Add space between token items */
+    background-color: var(--bg-dark);
+    padding: 10px;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+.token-value-wrapper code {
+    font-family: monospace;
+    word-break: break-all;
+    color: var(--orange);
+}
+.token-value-wrapper button {
+    font-size: 0.8em;
+    padding: 4px 8px;
+    flex-shrink: 0;
 }

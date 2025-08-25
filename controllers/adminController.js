@@ -4,6 +4,7 @@
 const statsService = require('../services/statsService');
 const promptService = require('../services/promptService');
 const keyManager = require('../services/keyManager');
+const tokenManager = require('../services/tokenManager');
 const pool = require('../config/db');
 
 const ADMIN_PASS = process.env.ADMIN_PASS || 'yomi123';
@@ -77,6 +78,32 @@ exports.deleteCommand = async (req, res) => {
         res.status(204).send();
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete command.' });
+    }
+};
+
+// --- API: User Tokens ---
+exports.getTokens = async (req, res) => {
+    try {
+        const tokens = await tokenManager.getAdminTokens();
+        res.json({ tokens });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch tokens.' });
+    }
+};
+exports.saveToken = async (req, res) => {
+    try {
+        const savedToken = await tokenManager.saveToken(req.body);
+        res.json({ success: true, token: savedToken });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to save token.', detail: error.message });
+    }
+};
+exports.deleteToken = async (req, res) => {
+    try {
+        await tokenManager.deleteToken(req.params.id);
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete token.' });
     }
 };
 

@@ -2,7 +2,7 @@
 // Handles the core logic of proxying requests to the respective AI providers.
 
 const axios = require('axios');
-const crypto = require('crypto'); // <-- NEW: For generating unique request IDs
+const crypto = require('crypto');
 const keyManager = require('../services/keyManager');
 const statsService = require('../services/statsService');
 const promptService = require('../services/promptService');
@@ -14,9 +14,10 @@ const promptService = require('../services/promptService');
  * @param {string} provider - The name of the provider (e.g., 'gemini').
  */
 exports.proxyRequest = async (req, res, provider) => {
-    // MODIFIED: Generate a unique ID for this request for clear logging.
     const reqId = crypto.randomBytes(4).toString('hex');
-    console.log(`\n--- [${reqId}] New Request for Provider: ${provider} ---`);
+    // MODIFIED: Add token name to log if available
+    const tokenUser = req.userTokenInfo ? ` (Token: ${req.userTokenInfo.name})` : '';
+    console.log(`\n--- [${reqId}] New Request for Provider: ${provider}${tokenUser} ---`);
 
     statsService.incrementPromptCount();
     const rotatingKey = keyManager.getRotatingKey(provider);
@@ -32,7 +33,6 @@ exports.proxyRequest = async (req, res, provider) => {
     let forwardUrl, forwardBody, headers;
 
     try {
-        // MODIFIED: Pass the reqId to the prompt builder for detailed logging.
         const finalMessages = await promptService.buildFinalMessages(provider, body.messages, reqId);
 
         // --- Provider-Specific Request Building ---

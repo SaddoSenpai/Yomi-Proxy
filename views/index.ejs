@@ -11,6 +11,20 @@
     <main class="container">
         <h1>Yomi Proxy</h1>
         <p>This is a public proxy for various AI models. Use the endpoints below with your preferred client.</p>
+        
+        <!-- NEW: Security Mode Display -->
+        <div class="security-info">
+            <strong>Security Mode:</strong> 
+            <% if (securityMode === 'none') { %>
+                <span class="status-none">None (Open to Public)</span>
+            <% } else if (securityMode === 'password') { %>
+                <span class="status-password">Password Protected</span>
+            <% } else if (securityMode === 'token') { %>
+                <span class="status-token">User Token Required</span>
+            <% } else { %>
+                <span class="status-unknown">Unknown</span>
+            <% } %>
+        </div>
 
         <% if (providers.length > 0) { %>
             <% providers.forEach(provider => { %>
@@ -20,10 +34,10 @@
                     </div>
                     
                     <div class="endpoint-wrapper">
-                        <code><%= baseUrl %>/<%= provider.name %></code>
+                        <code><%= baseUrl %>/<%= provider.name %>/v1/chat/completions</code>
                     </div>
 
-                    <button class="copy-btn" data-endpoint="<%= baseUrl %>/<%= provider.name %>">Copy</button>
+                    <button class="copy-btn" data-endpoint="<%= baseUrl %>/<%= provider.name %>/v1/chat/completions">Copy API Endpoint</button>
 
                     <div class="provider-details">
                         <div><strong>Max Context:</strong> <span><%= provider.maxContext %></span></div>

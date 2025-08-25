@@ -12,6 +12,9 @@ exports.renderMainPage = (req, res) => {
     
     // Get the base URL to display on the page
     const baseUrl = `${req.protocol}://${req.get('host')}`;
+    
+    // Get the security mode
+    const securityMode = process.env.SECURITY || 'none';
 
-    res.render('index', { providers, baseUrl });
+    res.render('index', { providers, baseUrl, securityMode });
 };

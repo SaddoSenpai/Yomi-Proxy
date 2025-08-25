@@ -9,6 +9,7 @@
     --green: #28a745;
     --orange: #ffae57;
     --red: #dc3545;
+    --blue: #3e64ff; /* Added for consistency */
 }
 
 body {
@@ -112,6 +113,26 @@ h1, h2 {
 .key-status.active { background-color: var(--green); color: white; }
 .key-status.over-quota { background-color: var(--orange); color: var(--bg-dark); }
 .key-status.revoked { background-color: var(--red); color: white; }
+
+/* NEW: Security Info Styles */
+.security-info {
+    background-color: var(--bg-card);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+    border: 1px solid var(--border-color);
+}
+.security-info span {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-weight: 500;
+    color: white;
+}
+.security-info .status-none { background-color: var(--green); }
+.security-info .status-password { background-color: var(--orange); color: var(--bg-dark); }
+.security-info .status-token { background-color: var(--blue); }
+.security-info .status-unknown { background-color: var(--red); }
+
 
 /* Login Page Styles (for /admin) */
 .login-container {

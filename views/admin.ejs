@@ -10,7 +10,6 @@
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
 </head>
 <body>
-    <!-- NEW: Overlay for mobile sidebar -->
     <div class="overlay"></div>
 
     <div class="sidebar">
@@ -35,6 +34,12 @@
                 <a href="#" class="nav-link" data-tab="commands">
                     <i class='bx bx-terminal'></i>
                     <span class="link_name">Commands</span>
+                </a>
+            </li>
+            <li>
+                <a href="#" class="nav-link" data-tab="tokens">
+                    <i class='bx bx-key'></i>
+                    <span class="link_name">User Tokens</span>
                 </a>
             </li>
             <li>
@@ -132,6 +137,57 @@
                             <div class="action-buttons">
                                 <button type="button" id="cmd_clear_btn" class="btn-secondary">Clear Form</button>
                                 <button type="submit" class="btn-primary">Save Command</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Tokens Tab -->
+            <div id="tokens" class="tab-content">
+                <div class="content-header">
+                    <h2>User Token Manager</h2>
+                </div>
+                <p class="muted">Create and manage user tokens for accessing the proxy. Rate limits are per minute.</p>
+                <div class="command-editor">
+                    <div class="command-list-wrapper">
+                        <h3>Existing Tokens</h3>
+                        <div id="tokensList"></div>
+                    </div>
+                    <div class="command-form-wrapper">
+                        <h3 id="token-form-title">Add New Token</h3>
+                        <form id="token-form">
+                            <input type="hidden" id="token_id">
+                            
+                            <div id="existing-token-wrapper" style="display: none;">
+                                <label>Current Token</label>
+                                <div class="input-with-copy">
+                                    <input id="token_value_display" type="text" readonly>
+                                    <button type="button" class="btn-copy-token" onclick="copyTokenValue()">Copy</button>
+                                </div>
+                            </div>
+
+                            <label for="token_name">Token Name (for identification)</label>
+                            <input id="token_name" placeholder="e.g., 'My Client App'" required>
+                            
+                            <label for="token_rpm">Rate Limit (Requests Per Minute)</label>
+                            <input id="token_rpm" type="number" value="60" required>
+                            
+                            <label for="token_enabled">Status</label>
+                            <select id="token_enabled">
+                                <option value="true">Enabled</option>
+                                <option value="false">Disabled</option>
+                            </select>
+
+                            <div id="regenerate-wrapper" style="display: none; margin-top: 15px;">
+                                <input type="checkbox" id="token_regenerate" style="width: auto; margin-bottom: 0;">
+                                <label for="token_regenerate" style="display: inline;">Regenerate Token Value</label>
+                                <p class="muted" style="margin-bottom: 0; font-size: 0.8em;">Check this to generate a new token value. The old one will be invalidated.</p>
+                            </div>
+
+                            <div class="action-buttons">
+                                <button type="button" id="token_clear_btn" class="btn-secondary">Clear Form</button>
+                                <button type="submit" class="btn-primary">Save Token</button>
                             </div>
                         </form>
                     </div>
