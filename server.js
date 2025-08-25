@@ -9,7 +9,7 @@ const session = require('express-session');
 const fileUpload = require('express-fileupload');
 const cors = require('cors');
 const keyManager = require('./services/keyManager');
-const tokenManager = require('./services/tokenManager'); // <-- ADDED
+const tokenManager = require('./services/tokenManager');
 const mainRoutes = require('./routes/mainRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const proxyController = require('./controllers/proxyController');
@@ -17,6 +17,9 @@ const { securityMiddleware } = require('./middleware/security');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// --- FIX: Trust the reverse proxy to get the correct protocol (https) ---
+app.set('trust proxy', 1); 
 
 // Universal Request Logger
 app.use((req, res, next) => {
@@ -37,7 +40,7 @@ app.set('view engine', 'ejs');
 
 // Define API routes *before* static files
 keyManager.initialize();
-tokenManager.initialize(); // <-- ADDED
+tokenManager.initialize();
 const availableProviders = keyManager.getAvailableProviders();
 console.log('[DEBUG] Providers found by keyManager:', availableProviders);
 
@@ -58,7 +61,7 @@ app.use(session({
     secret: 'yomi-proxy-secret-key-change-me',
     resave: false,
     saveUninitialized: true,
-    cookie: { secure: false }
+    cookie: { secure: false } // Set to true if you are using HTTPS directly on your server
 }));
 
 // Other Route Definitions
