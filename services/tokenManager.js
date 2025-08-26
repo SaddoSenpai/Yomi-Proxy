@@ -25,8 +25,7 @@ async function initialize() {
         }
         console.log(`[Token Manager] Loaded ${state.tokens.size} tokens into memory.`);
     } catch (error) {
-        console.error('[Token Manager] Error initializing tokens:', error.message);
-        console.error('[Token Manager] This might be due to a missing or incorrect `user_tokens` table in the database.');
+        console.error('[Token Manager] CRITICAL: Error initializing tokens. Check DB connection and table.', error);
     }
     // Clean up old request timestamps every minute
     setInterval(cleanupRequestTimestamps, 60 * 1000);

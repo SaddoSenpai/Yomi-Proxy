@@ -2,7 +2,7 @@
 // Manages API keys, their statuses, rotation, and automatic deactivation.
 
 const axios = require('axios');
-const pool = require('../config/db'); // <-- ADDED
+const pool = require('../config/db');
 
 // In-memory state to hold all provider and key information
 const state = {
@@ -70,7 +70,7 @@ async function initialize() {
             }
         }
     } catch (error) {
-        console.error('[Key Manager] CRITICAL: Could not load custom providers from database.', error.message);
+        console.error('[Key Manager] CRITICAL: Could not load custom providers from database. Check DB connection and table.', error);
     }
     console.log('[Key Manager] Initialization complete.');
 }
@@ -215,12 +215,6 @@ function getProviderConfig(provider) {
     return state.providers[provider]?.config || null;
 }
 
-/**
- * Deactivates a key due to an error.
- * @param {string} provider - The provider name.
- * @param {string} keyValue - The value of the key to deactivate.
- * @param {string} reason - The reason for deactivation ('over_quota' or 'revoked').
- */
 function deactivateKey(provider, keyValue, reason) {
     const key = state.providers[provider]?.keys.find(k => k.value === keyValue);
     if (key && key.status === 'active') {
@@ -228,25 +222,12 @@ function deactivateKey(provider, keyValue, reason) {
         console.log(`[Key Manager] Deactivated key for ${provider} due to: ${reason}. Key ending in ...${keyValue.slice(-4)}`);
     }
 }
-
-/**
- * Records a successful API call for a key, resetting its failure counter.
- * @param {string} provider - The provider name.
- * @param {string} keyValue - The value of the key.
- */
 function recordSuccess(provider, keyValue) {
     const key = state.providers[provider]?.keys.find(k => k.value === keyValue);
     if (key) {
         key.consecutiveFails = 0;
     }
 }
-
-/**
- * Records a failed API call for a key, incrementing its failure counter.
- * Deactivates the key if the threshold is reached.
- * @param {string} provider - The provider name.
- * @param {string} keyValue - The value of the key.
- */
 function recordFailure(provider, keyValue) {
     const key = state.providers[provider]?.keys.find(k => k.value === keyValue);
     if (key && key.status === 'active') {
