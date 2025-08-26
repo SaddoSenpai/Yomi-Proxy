@@ -154,30 +154,39 @@ exports.exportData = async (req, res) => {
 };
 
 exports.importData = async (req, res) => {
+    // --- MODIFIED: Get target provider from query and validate ---
+    const targetProvider = req.query.provider;
+    if (!targetProvider) {
+        return res.status(400).json({ error: 'No target provider specified for import. Please select one from the dropdown.' });
+    }
     if (!req.files || !req.files.configFile) {
         return res.status(400).json({ error: 'No file uploaded.' });
     }
+
     const client = await pool.connect();
     try {
         const file = req.files.configFile;
         const importData = JSON.parse(file.data.toString('utf8'));
-        const { provider, structure, commands } = importData;
+        // We ignore the 'provider' field from the file, using targetProvider instead.
+        const { structure, commands } = importData;
 
-        if (!provider || !Array.isArray(structure) || !Array.isArray(commands)) {
-            throw new Error('Invalid import file format.');
+        if (!Array.isArray(structure) || !Array.isArray(commands)) {
+            throw new Error('Invalid import file format. Missing "structure" or "commands" array.');
         }
 
         await client.query('BEGIN');
-        // Import structure
-        await client.query('DELETE FROM global_prompt_blocks WHERE provider = $1', [provider]);
+        
+        // Import structure to the target provider
+        await client.query('DELETE FROM global_prompt_blocks WHERE provider = $1', [targetProvider]);
         for (let i = 0; i < structure.length; i++) {
             const block = structure[i];
             await client.query(
                 'INSERT INTO global_prompt_blocks (provider, name, role, content, position, is_enabled, block_type) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-                [provider, block.name, block.role, block.content, i, block.is_enabled, block.block_type]
+                [targetProvider, block.name, block.role, block.content, i, block.is_enabled, block.block_type]
             );
         }
-        // Import commands (UPSERT logic)
+        
+        // Import commands (UPSERT logic - this affects commands globally, which is intended)
         for (const cmd of commands) {
             await client.query(
                 `INSERT INTO commands (command_tag, block_name, block_role, block_content, command_type)
@@ -191,8 +200,9 @@ exports.importData = async (req, res) => {
                 [cmd.command_tag.toUpperCase(), cmd.block_name, cmd.block_role, cmd.block_content, cmd.command_type]
             );
         }
+        
         await client.query('COMMIT');
-        res.json({ success: true, message: `Successfully imported config for ${provider}.` });
+        res.json({ success: true, message: `Successfully imported config to provider '${targetProvider}'.` });
     } catch (error) {
         await client.query('ROLLBACK');
         res.status(500).json({ error: 'Import failed.', detail: error.message });

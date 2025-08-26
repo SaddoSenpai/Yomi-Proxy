@@ -84,10 +84,12 @@ async function getCommandDefinitions(commandTags) {
  * MODIFIED: The complete, corrected prompt building logic.
  */
 async function buildFinalMessages(provider, incomingMessages, reqId) {
+    let effectiveProvider = provider;
     let structureToUse = await getStructure(provider);
     if (structureToUse.length === 0 && provider !== 'default') {
         console.log(`[${reqId}] No structure for '${provider}', falling back to 'default'.`);
         structureToUse = await getStructure('default');
+        effectiveProvider = 'default';
     }
 
     if (structureToUse.length === 0) {
@@ -95,12 +97,17 @@ async function buildFinalMessages(provider, incomingMessages, reqId) {
         return incomingMessages;
     }
     
-    console.log(`[${reqId}] Processing request with global structure for provider: ${provider}`);
+    console.log(`[${reqId}] Processing request with global structure for provider: ${effectiveProvider}`);
 
-    // --- NEW: Strict placeholder validation ---
+    // --- MODIFIED: More detailed placeholder validation ---
     const fullConfigContent = structureToUse.map(b => b.content || '').join('');
-    if (!fullConfigContent.includes('<<CHARACTER_INFO>>') || !fullConfigContent.includes('<<SCENARIO_INFO>>') || !fullConfigContent.includes('<<USER_INFO>>') || !fullConfigContent.includes('<<CHAT_HISTORY>>') || !fullConfigContent.includes('<<SUMMARY>>')) {
-        throw new Error('The active prompt configuration is invalid. It must contain all five placeholders: <<CHARACTER_INFO>>, <<SCENARIO_INFO>>, <<USER_INFO>>, <<CHAT_HISTORY>>, and <<SUMMARY>>.');
+    const requiredPlaceholders = ['<<CHARACTER_INFO>>', '<<SCENARIO_INFO>>', '<<USER_INFO>>', '<<CHAT_HISTORY>>', '<<SUMMARY>>'];
+    const missingPlaceholders = requiredPlaceholders.filter(p => !fullConfigContent.includes(p));
+
+    if (missingPlaceholders.length > 0) {
+        const errorDetail = `The active prompt configuration for provider '${effectiveProvider}' is invalid. It must contain all five placeholders, but is missing: ${missingPlaceholders.join(', ')}.`;
+        console.error(`[${reqId}] ${errorDetail}`);
+        throw new Error(errorDetail);
     }
 
     const { characterName, characterInfo, userInfo, scenarioInfo, summaryInfo, chatHistory } = parseJanitorInput(incomingMessages);

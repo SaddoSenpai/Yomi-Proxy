@@ -241,8 +241,18 @@
                     <div class="io-card">
                         <h3>Import Configuration</h3>
                         <p class="muted">Import a JSON file to overwrite a provider's structure and add/update commands.</p>
+                        <!-- --- MODIFIED: Added provider selector for import --- -->
+                        <div class="controls" style="margin-bottom: 15px;">
+                             <label for="importProviderSelector">Import To:</label>
+                             <select id="importProviderSelector">
+                                 <option value="default">Default (Fallback)</option>
+                                 <% availableProviders.forEach(p => { %>
+                                     <option value="<%= p %>"><%= p.charAt(0).toUpperCase() + p.slice(1) %></option>
+                                 <% }) %>
+                             </select>
+                        </div>
                         <input type="file" id="importFile" accept=".json">
-                        <button id="importBtn" class="btn-primary">Import</button>
+                        <button id="importBtn" class="btn-primary" style="margin-top: 15px;">Import</button>
                     </div>
                 </div>
             </div>

@@ -497,15 +497,23 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('importBtn').onclick = async () => {
         const fileInput = document.getElementById('importFile');
         if (fileInput.files.length === 0) return alert('Please select a file to import.');
+
+        // --- MODIFIED: Get target provider and send as query param ---
+        const provider = document.getElementById('importProviderSelector').value;
+        if (!provider) return alert('Please select a provider to import the configuration to.');
+
         const formData = new FormData();
         formData.append('configFile', fileInput.files[0]);
+        
         try {
-            const result = await fetch('/admin/api/import', { method: 'POST', body: formData });
+            const result = await fetch(`/admin/api/import?provider=${provider}`, { method: 'POST', body: formData });
             const data = await result.json();
             if (!result.ok) throw new Error(data.detail || data.error);
+            
             alert(data.message);
-            fetchStructure(providerSelector.value);
-            fetchCommands();
+            fileInput.value = ''; // Clear the file input
+            fetchStructure(providerSelector.value); // Refresh structure view
+            fetchCommands(); // Refresh commands
         } catch (error) {
             alert('Import failed: ' + error.message);
         }
