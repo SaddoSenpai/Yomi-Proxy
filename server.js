@@ -18,8 +18,7 @@ const { securityMiddleware } = require('./middleware/security');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// --- FIX: Trust the reverse proxy to get the correct protocol (https) ---
-app.set('trust proxy', 1); 
+app.set('trust proxy', 1);
 
 // Universal Request Logger
 app.use((req, res, next) => {
@@ -38,20 +37,25 @@ app.use(express.urlencoded({ extended: true }));
 app.use(fileUpload());
 app.set('view engine', 'ejs');
 
-// Define API routes *before* static files
-keyManager.initialize();
-tokenManager.initialize();
-const availableProviders = keyManager.getAvailableProviders();
-console.log('[DEBUG] Providers found by keyManager:', availableProviders);
+// --- DYNAMIC PROXY ROUTE ---
+// This single route handles all built-in and custom providers.
+const dynamicProxyRoute = '/:providerId/v1/chat/completions';
 
-availableProviders.forEach(provider => {
-    const fullEndpointPath = `/${provider}/v1/chat/completions`;
-    app.post(fullEndpointPath, securityMiddleware, (req, res) => {
-        console.log(`[OK] Route handler for ${fullEndpointPath} executed.`);
-        proxyController.proxyRequest(req, res, provider);
-    });
-    console.log(`[Router] Created DIRECT proxy endpoint: POST ${fullEndpointPath}`);
+app.post(dynamicProxyRoute, securityMiddleware, (req, res) => {
+    const { providerId } = req.params;
+    const availableProviders = keyManager.getAvailableProviders();
+
+    if (availableProviders.includes(providerId)) {
+        console.log(`[Router] Dynamic route matched for provider: ${providerId}`);
+        proxyController.proxyRequest(req, res, providerId);
+    } else {
+        console.warn(`[Router] 404 - No provider found for ID: ${providerId}`);
+        res.status(404).json({ error: `Provider '${providerId}' not found or is not enabled.` });
+    }
 });
+
+console.log(`[Router] Created DYNAMIC proxy endpoint: POST ${dynamicProxyRoute}`);
+
 
 // Now, define the static file server
 app.use(express.static('public'));
@@ -61,7 +65,7 @@ app.use(session({
     secret: 'yomi-proxy-secret-key-change-me',
     resave: false,
     saveUninitialized: true,
-    cookie: { secure: false } // Set to true if you are using HTTPS directly on your server
+    cookie: { secure: false }
 }));
 
 // Other Route Definitions
@@ -72,12 +76,15 @@ app.use('/admin', adminRoutes);
 async function startServer() {
     console.log('--- Yomi Proxy Starting Up ---');
     
+    // Initialize managers that load data into memory
+    await tokenManager.initialize();
+    await keyManager.initialize();
     await keyManager.checkAllKeys();
 
     app.listen(PORT, () => {
         console.log(`\n[OK] Yomi Proxy is running on http://localhost:${PORT}`);
-        if (availableProviders.length === 0) {
-            console.warn('[CRITICAL WARN] No API keys found! The proxy endpoints were NOT created. Check your Replit Secrets.');
+        if (keyManager.getAvailableProviders().length === 0) {
+            console.warn('[CRITICAL WARN] No API keys or custom providers found! The proxy endpoints will not work.');
         }
     });
 }

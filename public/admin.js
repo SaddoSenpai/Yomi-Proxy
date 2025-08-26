@@ -444,7 +444,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await api(`/custom-providers/${id}`, { method: 'DELETE' });
             fetchCustomProviders();
-            alert('Provider deleted. You may need to refresh the page for the changes to fully apply.');
+            alert('Provider deleted. Please REFRESH the page for the changes to fully apply.');
         } catch (error) {
             alert('Error deleting provider: ' + error.message);
         }
@@ -475,7 +475,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
             });
-            alert('Provider saved successfully! You may need to refresh the page for the changes to fully apply.');
+            alert('Provider saved successfully! Please REFRESH the page for the changes to fully apply.');
             document.getElementById('provider_clear_btn').click();
             fetchCustomProviders();
         } catch (error) {
