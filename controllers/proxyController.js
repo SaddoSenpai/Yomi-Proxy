@@ -37,7 +37,6 @@ exports.proxyRequest = async (req, res, provider) => {
 
         // --- Provider-Specific Request Building ---
         if (providerConfig.isCustom) {
-            // --- NEW: Enforced Model Name Validation ---
             if (providerConfig.enforcedModelName) {
                 if (body.model !== providerConfig.enforcedModelName) {
                     console.warn(`[${reqId}] Incorrect model requested. User sent '${body.model}', but provider '${provider}' requires '${providerConfig.enforcedModelName}'.`);
@@ -51,12 +50,20 @@ exports.proxyRequest = async (req, res, provider) => {
                     });
                 }
             }
-            // --- END NEW ---
 
             forwardUrl = `${providerConfig.apiBaseUrl}/v1/chat/completions`;
-            // The user's model is intentionally ignored here; we always use the one from the database config.
             forwardBody = { ...body, messages: finalMessages, model: providerConfig.modelId };
             headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
+
+            // --- NEW: Enforce max_tokens from admin settings ---
+            if (providerConfig.maxOutput && providerConfig.maxOutput !== 'Unlimited') {
+                const adminMaxTokens = parseInt(providerConfig.maxOutput, 10);
+                if (!isNaN(adminMaxTokens)) {
+                    console.log(`[${reqId}] Admin has set max_tokens to ${adminMaxTokens}. Overriding user value (if any).`);
+                    forwardBody.max_tokens = adminMaxTokens;
+                }
+            }
+
         } else {
             switch (provider) {
                 case 'gemini':

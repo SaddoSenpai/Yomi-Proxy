@@ -64,8 +64,10 @@ async function initialize() {
                         modelDisplayName: provider.model_display_name,
                         apiBaseUrl: provider.api_base_url.replace(/\/$/, ''), // Remove trailing slash
                         modelId: provider.model_id,
-                        // --- NEW: Load the enforced model name into memory ---
                         enforcedModelName: provider.enforced_model_name,
+                        // --- NEW: Load token limits from DB ---
+                        maxContext: provider.max_context_tokens || 'Unlimited',
+                        maxOutput: provider.max_output_tokens || 'Unlimited',
                     }
                 };
                 console.log(`[Key Manager] Loaded ${keys.length} key(s) for custom provider: ${provider.provider_id}.`);

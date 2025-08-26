@@ -45,14 +45,13 @@
                     <div class="provider-details">
                         <% if (provider.isCustom) { %>
                             <div><strong>Model:</strong> <span><%= provider.modelDisplayName || provider.modelId %></span></div>
-                            <!-- --- NEW: Display the required model name if it exists --- -->
                             <% if (provider.enforcedModelName) { %>
                                 <div><strong>Required Model:</strong> <span><%= provider.enforcedModelName %></span></div>
                             <% } %>
-                        <% } else { %>
-                            <div><strong>Max Context:</strong> <span><%= provider.maxContext %></span></div>
-                            <div><strong>Max Output:</strong> <span><%= provider.maxOutput %></span></div>
                         <% } %>
+                        <!-- --- MODIFIED: Simplified display for all providers --- -->
+                        <div><strong>Max Context:</strong> <span><%= provider.maxContext %></span></div>
+                        <div><strong>Max Output:</strong> <span><%= provider.maxOutput %></span></div>
                     </div>
                     <div class="provider-keys">
                         <span class="key-status active">Active: <%= provider.keys.active %></span>

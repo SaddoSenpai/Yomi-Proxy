@@ -192,13 +192,20 @@
                             <label for="provider_model_id">Actual Model ID (sent to the provider's API)</label>
                             <input id="provider_model_id" placeholder="e.g., llama-3-8b-instruct" required>
                             
-                            <!-- --- NEW: Enforced Model Name Field --- -->
                             <label for="provider_enforced_model_name">Required Model Name (for users, optional)</label>
                             <input id="provider_enforced_model_name" placeholder="e.g., galaxy-ai">
                             <p class="muted" style="margin-top: -10px; font-size: 0.8em;">If you fill this in, users MUST use this exact model name in their request.</p>
                             
                             <label for="provider_model_display_name">Model Display Name (optional)</label>
                             <input id="provider_model_display_name" placeholder="e.g., Llama 3 8B Instruct">
+                            
+                            <!-- --- NEW: Max Tokens Fields --- -->
+                            <label for="provider_max_context_tokens">Max Context Tokens (optional)</label>
+                            <input id="provider_max_context_tokens" type="number" placeholder="e.g., 8192">
+
+                            <label for="provider_max_output_tokens">Max Output Tokens (optional)</label>
+                            <input id="provider_max_output_tokens" type="number" placeholder="e.g., 2048">
+                            <p class="muted" style="margin-top: -10px; font-size: 0.8em;">This will override the user's `max_tokens` setting for this provider.</p>
                             
                             <label for="provider_api_keys">API Keys (comma-separated)</label>
                             <textarea id="provider_api_keys" placeholder="key1, key2, key3..."></textarea>
@@ -241,7 +248,6 @@
                     <div class="io-card">
                         <h3>Import Configuration</h3>
                         <p class="muted">Import a JSON file to overwrite a provider's structure and add/update commands.</p>
-                        <!-- --- MODIFIED: Added provider selector for import --- -->
                         <div class="controls" style="margin-bottom: 15px;">
                              <label for="importProviderSelector">Import To:</label>
                              <select id="importProviderSelector">

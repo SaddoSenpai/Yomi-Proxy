@@ -18,27 +18,62 @@ async function getAll() {
  * @param {object} providerData - The provider data from the admin form.
  */
 async function save(providerData) {
-    // --- MODIFIED: Destructure the new field ---
-    const { id, provider_id, display_name, api_base_url, api_keys, model_id, model_display_name, is_enabled, enforced_model_name } = providerData;
+    // --- FIXED: Correctly destructure and use all fields from the provider data ---
+    const { 
+        id, 
+        provider_id, 
+        display_name, 
+        api_base_url, 
+        api_keys, 
+        model_id, 
+        model_display_name, 
+        is_enabled, 
+        enforced_model_name, 
+        max_context_tokens, 
+        max_output_tokens 
+    } = providerData;
 
-    if (id) { // Update
+    let criticalChange = false;
+
+    if (id) { // This is an UPDATE
+        // --- NEW: Check for critical changes before updating ---
+        const { rows } = await pool.query('SELECT api_base_url, api_keys, model_id FROM custom_providers WHERE id = $1', [id]);
+        if (rows.length > 0) {
+            const oldProvider = rows[0];
+            if (oldProvider.api_base_url !== api_base_url || oldProvider.api_keys !== api_keys || oldProvider.model_id !== model_id) {
+                console.log('[Custom Provider] Critical change detected (URL, keys, or model ID). Full key re-validation will be triggered.');
+                criticalChange = true;
+            } else {
+                console.log('[Custom Provider] Non-critical change detected. Key validation will be skipped.');
+            }
+        }
+
         await pool.query(
             `UPDATE custom_providers SET 
                 provider_id = $1, display_name = $2, api_base_url = $3, api_keys = $4, 
-                model_id = $5, model_display_name = $6, is_enabled = $7, enforced_model_name = $8, updated_at = NOW() 
-             WHERE id = $9`,
-            [provider_id, display_name, api_base_url, api_keys, model_id, model_display_name, is_enabled, enforced_model_name, id]
+                model_id = $5, model_display_name = $6, is_enabled = $7, enforced_model_name = $8, 
+                max_context_tokens = $9, max_output_tokens = $10, updated_at = NOW() 
+             WHERE id = $11`,
+            [provider_id, display_name, api_base_url, api_keys, model_id, model_display_name, is_enabled, enforced_model_name, max_context_tokens, max_output_tokens, id]
         );
-    } else { // Insert
+    } else { // This is an INSERT
+        criticalChange = true; // A new provider is always a critical change.
         await pool.query(
             `INSERT INTO custom_providers 
-                (provider_id, display_name, api_base_url, api_keys, model_id, model_display_name, is_enabled, enforced_model_name) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-            [provider_id, display_name, api_base_url, api_keys, model_id, model_display_name, is_enabled, enforced_model_name]
+                (provider_id, display_name, api_base_url, api_keys, model_id, model_display_name, is_enabled, enforced_model_name, max_context_tokens, max_output_tokens) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            [provider_id, display_name, api_base_url, api_keys, model_id, model_display_name, is_enabled, enforced_model_name, max_context_tokens, max_output_tokens]
         );
     }
-    // Crucially, re-initialize the key manager to load the changes into memory
+
+    // --- MODIFIED: Conditional Key Checking ---
+    // Always re-initialize to load the latest config (including display names, token limits, etc.) into memory.
     await keyManager.initialize();
+
+    // Only perform the expensive key validation if a critical setting was changed.
+    if (criticalChange) {
+        await keyManager.checkAllKeys();
+    }
 }
 
 /**

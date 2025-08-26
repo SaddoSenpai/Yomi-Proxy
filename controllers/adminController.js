@@ -5,7 +5,7 @@ const statsService = require('../services/statsService');
 const promptService = require('../services/promptService');
 const keyManager = require('../services/keyManager');
 const tokenManager = require('../services/tokenManager');
-const customProviderManager = require('../services/customProviderManager'); // <-- ADDED
+const customProviderManager = require('../services/customProviderManager');
 const pool = require('../config/db');
 
 const ADMIN_PASS = process.env.ADMIN_PASS || 'yomi123';
@@ -108,7 +108,7 @@ exports.deleteToken = async (req, res) => {
     }
 };
 
-// --- API: Custom Providers (NEW) ---
+// --- API: Custom Providers ---
 exports.getCustomProviders = async (req, res) => {
     try {
         const providers = await customProviderManager.getAll();
@@ -117,14 +117,45 @@ exports.getCustomProviders = async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch custom providers.' });
     }
 };
+
 exports.saveCustomProvider = async (req, res) => {
     try {
-        await customProviderManager.save(req.body);
+        // --- MODIFIED: Explicitly destructure all expected fields for clarity and security ---
+        const {
+            id,
+            provider_id,
+            display_name,
+            api_base_url,
+            api_keys,
+            model_id,
+            model_display_name,
+            is_enabled,
+            enforced_model_name,
+            max_context_tokens,
+            max_output_tokens
+        } = req.body;
+
+        const providerData = {
+            id,
+            provider_id,
+            display_name,
+            api_base_url,
+            api_keys,
+            model_id,
+            model_display_name,
+            is_enabled,
+            enforced_model_name,
+            max_context_tokens,
+            max_output_tokens
+        };
+
+        await customProviderManager.save(providerData);
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'Failed to save custom provider.', detail: error.message });
     }
 };
+
 exports.deleteCustomProvider = async (req, res) => {
     try {
         await customProviderManager.remove(req.params.id);
@@ -154,7 +185,6 @@ exports.exportData = async (req, res) => {
 };
 
 exports.importData = async (req, res) => {
-    // --- MODIFIED: Get target provider from query and validate ---
     const targetProvider = req.query.provider;
     if (!targetProvider) {
         return res.status(400).json({ error: 'No target provider specified for import. Please select one from the dropdown.' });
@@ -167,7 +197,6 @@ exports.importData = async (req, res) => {
     try {
         const file = req.files.configFile;
         const importData = JSON.parse(file.data.toString('utf8'));
-        // We ignore the 'provider' field from the file, using targetProvider instead.
         const { structure, commands } = importData;
 
         if (!Array.isArray(structure) || !Array.isArray(commands)) {
@@ -176,7 +205,6 @@ exports.importData = async (req, res) => {
 
         await client.query('BEGIN');
         
-        // Import structure to the target provider
         await client.query('DELETE FROM global_prompt_blocks WHERE provider = $1', [targetProvider]);
         for (let i = 0; i < structure.length; i++) {
             const block = structure[i];
@@ -186,7 +214,6 @@ exports.importData = async (req, res) => {
             );
         }
         
-        // Import commands (UPSERT logic - this affects commands globally, which is intended)
         for (const cmd of commands) {
             await client.query(
                 `INSERT INTO commands (command_tag, block_name, block_role, block_content, command_type)
