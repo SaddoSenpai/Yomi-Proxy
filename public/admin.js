@@ -431,7 +431,7 @@ document.addEventListener('DOMContentLoaded', () => {
         providerFormTitle.textContent = 'Edit Provider';
         document.getElementById('provider_id_hidden').value = p.id;
         document.getElementById('provider_display_name').value = p.display_name;
-        document.getElementById('provider_id').value = p.provider_id;
+        document.getElementById('provider_id_input').value = p.provider_id; // --- BUG FIX --- Was 'provider_id'
         document.getElementById('provider_api_base_url').value = p.api_base_url;
         document.getElementById('provider_model_id').value = p.model_id;
         document.getElementById('provider_model_display_name').value = p.model_display_name || '';
@@ -461,7 +461,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const body = {
             id: document.getElementById('provider_id_hidden').value || null,
             display_name: document.getElementById('provider_display_name').value,
-            provider_id: document.getElementById('provider_id').value,
+            provider_id: document.getElementById('provider_id_input').value, // --- BUG FIX --- Was 'provider_id'
             api_base_url: document.getElementById('provider_api_base_url').value,
             model_id: document.getElementById('provider_model_id').value,
             model_display_name: document.getElementById('provider_model_display_name').value,

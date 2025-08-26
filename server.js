@@ -15,6 +15,10 @@ const adminRoutes = require('./routes/adminRoutes');
 const proxyController = require('./controllers/proxyController');
 const { securityMiddleware } = require('./middleware/security');
 
+// --- ADDED: For persistent database sessions ---
+const pgSession = require('connect-pg-simple')(session);
+const pool = require('./config/db'); // Your existing database pool
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -60,12 +64,20 @@ console.log(`[Router] Created DYNAMIC proxy endpoint: POST ${dynamicProxyRoute}`
 // Now, define the static file server
 app.use(express.static('public'));
 
-// Session middleware
+// --- MODIFIED: Session middleware now uses the database ---
 app.use(session({
-    secret: 'yomi-proxy-secret-key-change-me',
+    store: new pgSession({
+        pool: pool,                // Connection pool
+        tableName: 'user_sessions' // Use a custom table name
+    }),
+    // IMPORTANT: Change this secret to a long, random string in your .env file
+    secret: process.env.SESSION_SECRET || 'yomi-proxy-secret-key-change-me',
     resave: false,
-    saveUninitialized: true,
-    cookie: { secure: false }
+    saveUninitialized: false, // Set to false for best practice
+    cookie: {
+        secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+        maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+    }
 }));
 
 // Other Route Definitions
