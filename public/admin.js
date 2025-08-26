@@ -431,9 +431,11 @@ document.addEventListener('DOMContentLoaded', () => {
         providerFormTitle.textContent = 'Edit Provider';
         document.getElementById('provider_id_hidden').value = p.id;
         document.getElementById('provider_display_name').value = p.display_name;
-        document.getElementById('provider_id_input').value = p.provider_id; // --- BUG FIX --- Was 'provider_id'
+        document.getElementById('provider_id_input').value = p.provider_id;
         document.getElementById('provider_api_base_url').value = p.api_base_url;
         document.getElementById('provider_model_id').value = p.model_id;
+        // --- MODIFIED: Populate the new field ---
+        document.getElementById('provider_enforced_model_name').value = p.enforced_model_name || '';
         document.getElementById('provider_model_display_name').value = p.model_display_name || '';
         document.getElementById('provider_api_keys').value = p.api_keys || '';
         document.getElementById('provider_enabled').value = p.is_enabled;
@@ -461,9 +463,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const body = {
             id: document.getElementById('provider_id_hidden').value || null,
             display_name: document.getElementById('provider_display_name').value,
-            provider_id: document.getElementById('provider_id_input').value, // --- BUG FIX --- Was 'provider_id'
+            provider_id: document.getElementById('provider_id_input').value,
             api_base_url: document.getElementById('provider_api_base_url').value,
             model_id: document.getElementById('provider_model_id').value,
+            // --- MODIFIED: Send the new field to the backend ---
+            enforced_model_name: document.getElementById('provider_enforced_model_name').value.trim() || null, // Send null if empty
             model_display_name: document.getElementById('provider_model_display_name').value,
             api_keys: document.getElementById('provider_api_keys').value,
             is_enabled: document.getElementById('provider_enabled').value === 'true',

@@ -37,7 +37,24 @@ exports.proxyRequest = async (req, res, provider) => {
 
         // --- Provider-Specific Request Building ---
         if (providerConfig.isCustom) {
+            // --- NEW: Enforced Model Name Validation ---
+            if (providerConfig.enforcedModelName) {
+                if (body.model !== providerConfig.enforcedModelName) {
+                    console.warn(`[${reqId}] Incorrect model requested. User sent '${body.model}', but provider '${provider}' requires '${providerConfig.enforcedModelName}'.`);
+                    return res.status(400).json({
+                        error: {
+                            message: `The model \`${body.model}\` does not exist for this provider. Please use the correct model: \`${providerConfig.enforcedModelName}\`.`,
+                            type: 'invalid_request_error',
+                            param: 'model',
+                            code: 'model_not_found'
+                        }
+                    });
+                }
+            }
+            // --- END NEW ---
+
             forwardUrl = `${providerConfig.apiBaseUrl}/v1/chat/completions`;
+            // The user's model is intentionally ignored here; we always use the one from the database config.
             forwardBody = { ...body, messages: finalMessages, model: providerConfig.modelId };
             headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
         } else {

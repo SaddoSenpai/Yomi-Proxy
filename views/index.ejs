@@ -29,7 +29,6 @@
             <% providers.forEach(provider => { %>
                 <div class="provider-card">
                     <div class="provider-header">
-                        <!-- MODIFIED: Display logic for custom vs built-in -->
                         <% if (provider.isCustom) { %>
                             <h2><%= provider.displayName %></h2>
                         <% } else { %>
@@ -44,9 +43,12 @@
                     <button class="copy-btn" data-endpoint="<%= baseUrl %>/<%= provider.name %>/v1/chat/completions">Copy API Endpoint</button>
 
                     <div class="provider-details">
-                        <!-- MODIFIED: Display logic for custom vs built-in -->
                         <% if (provider.isCustom) { %>
                             <div><strong>Model:</strong> <span><%= provider.modelDisplayName || provider.modelId %></span></div>
+                            <!-- --- NEW: Display the required model name if it exists --- -->
+                            <% if (provider.enforcedModelName) { %>
+                                <div><strong>Required Model:</strong> <span><%= provider.enforcedModelName %></span></div>
+                            <% } %>
                         <% } else { %>
                             <div><strong>Max Context:</strong> <span><%= provider.maxContext %></span></div>
                             <div><strong>Max Output:</strong> <span><%= provider.maxOutput %></span></div>

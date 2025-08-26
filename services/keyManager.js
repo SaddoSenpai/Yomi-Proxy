@@ -64,6 +64,8 @@ async function initialize() {
                         modelDisplayName: provider.model_display_name,
                         apiBaseUrl: provider.api_base_url.replace(/\/$/, ''), // Remove trailing slash
                         modelId: provider.model_id,
+                        // --- NEW: Load the enforced model name into memory ---
+                        enforcedModelName: provider.enforced_model_name,
                     }
                 };
                 console.log(`[Key Manager] Loaded ${keys.length} key(s) for custom provider: ${provider.provider_id}.`);
@@ -71,8 +73,6 @@ async function initialize() {
         }
     } catch (error) {
         console.error('[Key Manager] CRITICAL: Could not load custom providers from database. Check DB connection and table.', error);
-        // MODIFIED: Re-throw the error to prevent the server from starting in a broken state.
-        // This makes it obvious that a critical startup step has failed.
         throw error;
     }
     console.log('[Key Manager] Initialization complete.');

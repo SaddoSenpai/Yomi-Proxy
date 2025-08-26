@@ -21,7 +21,6 @@
             <li><a href="#" class="nav-link" data-tab="structure"><i class='bx bx-list-ul'></i><span class="link_name">Structure</span></a></li>
             <li><a href="#" class="nav-link" data-tab="commands"><i class='bx bx-terminal'></i><span class="link_name">Commands</span></a></li>
             <li><a href="#" class="nav-link" data-tab="tokens"><i class='bx bx-key'></i><span class="link_name">User Tokens</span></a></li>
-            <!-- NEW: Custom Providers Nav Link -->
             <li><a href="#" class="nav-link" data-tab="custom-providers"><i class='bx bx-extension'></i><span class="link_name">Custom Providers</span></a></li>
             <li><a href="#" class="nav-link" data-tab="import-export"><i class='bx bx-transfer-alt'></i><span class="link_name">Import/Export</span></a></li>
             <li class="logout-link"><a href="/admin/logout"><i class='bx bx-log-out'></i><span class="link_name">Logout</span></a></li>
@@ -165,7 +164,7 @@
                 </div>
             </div>
 
-            <!-- NEW: Custom Providers Tab -->
+            <!-- Custom Providers Tab -->
             <div id="custom-providers" class="tab-content">
                 <div class="content-header">
                     <h2>Custom Provider Manager</h2>
@@ -190,8 +189,13 @@
                             <label for="provider_api_base_url">API Base URL (without /v1/chat/completions)</label>
                             <input id="provider_api_base_url" type="url" placeholder="https://api.example.com" required>
                             
-                            <label for="provider_model_id">Model ID</label>
+                            <label for="provider_model_id">Actual Model ID (sent to the provider's API)</label>
                             <input id="provider_model_id" placeholder="e.g., llama-3-8b-instruct" required>
+                            
+                            <!-- --- NEW: Enforced Model Name Field --- -->
+                            <label for="provider_enforced_model_name">Required Model Name (for users, optional)</label>
+                            <input id="provider_enforced_model_name" placeholder="e.g., galaxy-ai">
+                            <p class="muted" style="margin-top: -10px; font-size: 0.8em;">If you fill this in, users MUST use this exact model name in their request.</p>
                             
                             <label for="provider_model_display_name">Model Display Name (optional)</label>
                             <input id="provider_model_display_name" placeholder="e.g., Llama 3 8B Instruct">

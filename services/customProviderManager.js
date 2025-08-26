@@ -18,22 +18,23 @@ async function getAll() {
  * @param {object} providerData - The provider data from the admin form.
  */
 async function save(providerData) {
-    const { id, provider_id, display_name, api_base_url, api_keys, model_id, model_display_name, is_enabled } = providerData;
+    // --- MODIFIED: Destructure the new field ---
+    const { id, provider_id, display_name, api_base_url, api_keys, model_id, model_display_name, is_enabled, enforced_model_name } = providerData;
 
     if (id) { // Update
         await pool.query(
             `UPDATE custom_providers SET 
                 provider_id = $1, display_name = $2, api_base_url = $3, api_keys = $4, 
-                model_id = $5, model_display_name = $6, is_enabled = $7, updated_at = NOW() 
-             WHERE id = $8`,
-            [provider_id, display_name, api_base_url, api_keys, model_id, model_display_name, is_enabled, id]
+                model_id = $5, model_display_name = $6, is_enabled = $7, enforced_model_name = $8, updated_at = NOW() 
+             WHERE id = $9`,
+            [provider_id, display_name, api_base_url, api_keys, model_id, model_display_name, is_enabled, enforced_model_name, id]
         );
     } else { // Insert
         await pool.query(
             `INSERT INTO custom_providers 
-                (provider_id, display_name, api_base_url, api_keys, model_id, model_display_name, is_enabled) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [provider_id, display_name, api_base_url, api_keys, model_id, model_display_name, is_enabled]
+                (provider_id, display_name, api_base_url, api_keys, model_id, model_display_name, is_enabled, enforced_model_name) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [provider_id, display_name, api_base_url, api_keys, model_id, model_display_name, is_enabled, enforced_model_name]
         );
     }
     // Crucially, re-initialize the key manager to load the changes into memory
