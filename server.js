@@ -36,8 +36,11 @@ app.use((req, res, next) => {
 
 // --- Middleware Setup ---
 app.use(cors());
-app.use(bodyParser.json());
-app.use(express.urlencoded({ extended: true }));
+
+// --- MODIFIED: Increased payload size limits to prevent "PayloadTooLargeError" ---
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
 app.use(fileUpload());
 app.set('view engine', 'ejs');
 
