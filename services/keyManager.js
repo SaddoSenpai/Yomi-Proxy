@@ -71,6 +71,9 @@ async function initialize() {
         }
     } catch (error) {
         console.error('[Key Manager] CRITICAL: Could not load custom providers from database. Check DB connection and table.', error);
+        // MODIFIED: Re-throw the error to prevent the server from starting in a broken state.
+        // This makes it obvious that a critical startup step has failed.
+        throw error;
     }
     console.log('[Key Manager] Initialization complete.');
 }
