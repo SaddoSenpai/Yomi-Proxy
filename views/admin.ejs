@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Yomi Proxy</title>
     <link rel="stylesheet" href="/admin-style.css">
-    <!-- Boxicons for icons -->
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
 </head>
 <body>
@@ -18,42 +17,14 @@
             <span class="logo_name">Yomi Proxy</span>
         </div>
         <ul class="nav-links">
-            <li>
-                <a href="#" class="nav-link active" data-tab="dashboard">
-                    <i class='bx bx-grid-alt'></i>
-                    <span class="link_name">Dashboard</span>
-                </a>
-            </li>
-            <li>
-                <a href="#" class="nav-link" data-tab="structure">
-                    <i class='bx bx-list-ul'></i>
-                    <span class="link_name">Structure</span>
-                </a>
-            </li>
-            <li>
-                <a href="#" class="nav-link" data-tab="commands">
-                    <i class='bx bx-terminal'></i>
-                    <span class="link_name">Commands</span>
-                </a>
-            </li>
-            <li>
-                <a href="#" class="nav-link" data-tab="tokens">
-                    <i class='bx bx-key'></i>
-                    <span class="link_name">User Tokens</span>
-                </a>
-            </li>
-            <li>
-                <a href="#" class="nav-link" data-tab="import-export">
-                    <i class='bx bx-transfer-alt'></i>
-                    <span class="link_name">Import/Export</span>
-                </a>
-            </li>
-            <li class="logout-link">
-                <a href="/admin/logout">
-                    <i class='bx bx-log-out'></i>
-                    <span class="link_name">Logout</span>
-                </a>
-            </li>
+            <li><a href="#" class="nav-link active" data-tab="dashboard"><i class='bx bx-grid-alt'></i><span class="link_name">Dashboard</span></a></li>
+            <li><a href="#" class="nav-link" data-tab="structure"><i class='bx bx-list-ul'></i><span class="link_name">Structure</span></a></li>
+            <li><a href="#" class="nav-link" data-tab="commands"><i class='bx bx-terminal'></i><span class="link_name">Commands</span></a></li>
+            <li><a href="#" class="nav-link" data-tab="tokens"><i class='bx bx-key'></i><span class="link_name">User Tokens</span></a></li>
+            <!-- NEW: Custom Providers Nav Link -->
+            <li><a href="#" class="nav-link" data-tab="custom-providers"><i class='bx bx-extension'></i><span class="link_name">Custom Providers</span></a></li>
+            <li><a href="#" class="nav-link" data-tab="import-export"><i class='bx bx-transfer-alt'></i><span class="link_name">Import/Export</span></a></li>
+            <li class="logout-link"><a href="/admin/logout"><i class='bx bx-log-out'></i><span class="link_name">Logout</span></a></li>
         </ul>
     </div>
 
@@ -188,6 +159,55 @@
                             <div class="action-buttons">
                                 <button type="button" id="token_clear_btn" class="btn-secondary">Clear Form</button>
                                 <button type="submit" class="btn-primary">Save Token</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NEW: Custom Providers Tab -->
+            <div id="custom-providers" class="tab-content">
+                <div class="content-header">
+                    <h2>Custom Provider Manager</h2>
+                </div>
+                <p class="muted">Add any OpenAI-compatible API endpoint. The system will automatically validate keys on save. You must restart the server for changes to take effect.</p>
+                <div class="command-editor">
+                    <div class="command-list-wrapper">
+                        <h3>Existing Providers</h3>
+                        <div id="customProvidersList"></div>
+                    </div>
+                    <div class="command-form-wrapper">
+                        <h3 id="provider-form-title">Add New Provider</h3>
+                        <form id="provider-form">
+                            <input type="hidden" id="provider_id_hidden">
+                            
+                            <label for="provider_display_name">Display Name (on main page)</label>
+                            <input id="provider_display_name" placeholder="e.g., My Llama Provider" required>
+                            
+                            <label for="provider_id_input">Provider ID (for URL, no spaces/special chars)</label>
+                            <input id="provider_id_input" placeholder="e.g., my-llama-provider" required pattern="[a-z0-9-]+" title="Only lowercase letters, numbers, and hyphens are allowed.">
+                            
+                            <label for="provider_api_base_url">API Base URL (without /v1/chat/completions)</label>
+                            <input id="provider_api_base_url" type="url" placeholder="https://api.example.com" required>
+                            
+                            <label for="provider_model_id">Model ID</label>
+                            <input id="provider_model_id" placeholder="e.g., llama-3-8b-instruct" required>
+                            
+                            <label for="provider_model_display_name">Model Display Name (optional)</label>
+                            <input id="provider_model_display_name" placeholder="e.g., Llama 3 8B Instruct">
+                            
+                            <label for="provider_api_keys">API Keys (comma-separated)</label>
+                            <textarea id="provider_api_keys" placeholder="key1, key2, key3..."></textarea>
+                            
+                            <label for="provider_enabled">Status</label>
+                            <select id="provider_enabled">
+                                <option value="true">Enabled</option>
+                                <option value="false">Disabled</option>
+                            </select>
+
+                            <div class="action-buttons">
+                                <button type="button" id="provider_clear_btn" class="btn-secondary">Clear Form</button>
+                                <button type="submit" class="btn-primary">Save Provider</button>
                             </div>
                         </form>
                     </div>

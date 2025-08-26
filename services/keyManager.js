@@ -2,6 +2,7 @@
 // Manages API keys, their statuses, rotation, and automatic deactivation.
 
 const axios = require('axios');
+const pool = require('../config/db'); // <-- ADDED
 
 // In-memory state to hold all provider and key information
 const state = {
@@ -11,12 +12,15 @@ const state = {
 const RATE_LIMIT_THRESHOLD = 20; // Deactivate after 20 consecutive rate limit errors
 
 /**
- * Initializes the key manager by reading keys and settings from environment variables.
+ * Initializes the key manager by reading keys and settings from environment variables
+ * and custom providers from the database.
  */
-function initialize() {
+async function initialize() {
     console.log('[Key Manager] Initializing...');
-    const supportedProviders = ['GEMINI', 'DEEPSEEK', 'OPENAI', 'OPENROUTER', 'MISTRAL'];
+    state.providers = {}; // Clear existing providers before re-loading
 
+    // 1. Load built-in providers from .env
+    const supportedProviders = ['GEMINI', 'DEEPSEEK', 'OPENAI', 'OPENROUTER', 'MISTRAL'];
     for (const provider of supportedProviders) {
         const keysEnv = process.env[`${provider}_KEY`];
         if (keysEnv) {
@@ -26,23 +30,87 @@ function initialize() {
                 state.providers[providerName] = {
                     keys: keys.map(key => ({
                         value: key,
-                        status: 'unchecked', // Initial status
+                        status: 'unchecked',
                         consecutiveFails: 0,
                     })),
                     currentIndex: 0,
                     config: {
+                        isCustom: false,
                         maxContext: process.env[`MAX_CONTEXT_${provider}`] || 'Unlimited',
                         maxOutput: process.env[`MAX_OUTPUT_${provider}`] || 'Unlimited',
                     }
                 };
-                console.log(`[Key Manager] Loaded ${keys.length} key(s) for ${providerName}.`);
+                console.log(`[Key Manager] Loaded ${keys.length} key(s) for built-in provider: ${providerName}.`);
             }
+        }
+    }
+
+    // 2. Load custom providers from the database
+    try {
+        const { rows } = await pool.query('SELECT * FROM custom_providers WHERE is_enabled = true');
+        for (const provider of rows) {
+            const keys = (provider.api_keys || '').split(',').map(k => k.trim()).filter(Boolean);
+            if (keys.length > 0) {
+                state.providers[provider.provider_id] = {
+                    keys: keys.map(key => ({
+                        value: key,
+                        status: 'unchecked',
+                        consecutiveFails: 0,
+                    })),
+                    currentIndex: 0,
+                    config: {
+                        isCustom: true,
+                        displayName: provider.display_name,
+                        modelDisplayName: provider.model_display_name,
+                        apiBaseUrl: provider.api_base_url.replace(/\/$/, ''), // Remove trailing slash
+                        modelId: provider.model_id,
+                    }
+                };
+                console.log(`[Key Manager] Loaded ${keys.length} key(s) for custom provider: ${provider.provider_id}.`);
+            }
+        }
+    } catch (error) {
+        console.error('[Key Manager] CRITICAL: Could not load custom providers from database.', error.message);
+    }
+    console.log('[Key Manager] Initialization complete.');
+}
+
+/**
+ * Tests a single API key for a custom provider.
+ * @param {object} providerConfig - The configuration for the custom provider.
+ * @param {object} key - The key object to test.
+ */
+async function testCustomKey(providerConfig, key) {
+    const testUrl = `${providerConfig.apiBaseUrl}/v1/chat/completions`;
+    const testPayload = {
+        model: providerConfig.modelId,
+        messages: [{ role: 'user', content: 'hello' }],
+        max_tokens: 1
+    };
+    const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${key.value}`
+    };
+
+    try {
+        await axios.post(testUrl, testPayload, { headers, timeout: 10000 });
+        key.status = 'active';
+    } catch (error) {
+        const status = error.response?.status;
+        if (status === 401 || status === 403) {
+            key.status = 'revoked';
+        } else if (status === 402) {
+            key.status = 'over_quota';
+        } else {
+            key.status = 'revoked';
+            console.warn(`[Key Test] Custom key for ${providerConfig.displayName} failed with status ${status || 'N/A'}. Error: ${error.message}`);
         }
     }
 }
 
+
 /**
- * Tests a single API key to check its validity.
+ * Tests a single API key to check its validity for built-in providers.
  * @param {string} provider - The name of the provider (e.g., 'gemini').
  * @param {object} key - The key object to test.
  */
@@ -78,7 +146,7 @@ async function testKey(provider, key) {
                 headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
                 break;
             default:
-                key.status = 'revoked'; // Unsupported provider for testing
+                key.status = 'revoked'; // Should not happen for built-ins
                 return;
         }
 
@@ -87,11 +155,11 @@ async function testKey(provider, key) {
     } catch (error) {
         const status = error.response?.status;
         if (status === 401 || status === 403) {
-            key.status = 'revoked'; // Invalid key
+            key.status = 'revoked';
         } else if (status === 402) {
-            key.status = 'over_quota'; // Insufficient balance
+            key.status = 'over_quota';
         } else {
-            key.status = 'revoked'; // Assume other errors mean the key is unusable
+            key.status = 'revoked';
             console.warn(`[Key Test] Key for ${provider} failed with status ${status || 'N/A'}. Error: ${error.message}`);
         }
     }
@@ -104,8 +172,13 @@ async function checkAllKeys() {
     console.log('[Key Manager] Performing startup key validation...');
     const promises = [];
     for (const providerName in state.providers) {
-        for (const key of state.providers[providerName].keys) {
-            promises.push(testKey(providerName, key));
+        const providerData = state.providers[providerName];
+        for (const key of providerData.keys) {
+            if (providerData.config.isCustom) {
+                promises.push(testCustomKey(providerData.config, key));
+            } else {
+                promises.push(testKey(providerName, key));
+            }
         }
     }
     await Promise.all(promises);
@@ -131,6 +204,15 @@ function getRotatingKey(provider) {
         }
     }
     return null; // No active keys found
+}
+
+/**
+ * Returns the configuration for a specific provider.
+ * @param {string} provider - The name of the provider.
+ * @returns {object|null}
+ */
+function getProviderConfig(provider) {
+    return state.providers[provider]?.config || null;
 }
 
 /**
@@ -195,7 +277,7 @@ function getProviderStats() {
         const providerData = state.providers[providerName];
         stats[providerName] = {
             ...providerData.config,
-            name: providerName,
+            name: providerName, // This is the provider_id for custom providers
             keys: {
                 active: providerData.keys.filter(k => k.status === 'active').length,
                 over_quota: providerData.keys.filter(k => k.status === 'over_quota').length,
@@ -210,6 +292,7 @@ module.exports = {
     initialize,
     checkAllKeys,
     getRotatingKey,
+    getProviderConfig,
     deactivateKey,
     recordSuccess,
     recordFailure,

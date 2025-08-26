@@ -5,6 +5,7 @@ const statsService = require('../services/statsService');
 const promptService = require('../services/promptService');
 const keyManager = require('../services/keyManager');
 const tokenManager = require('../services/tokenManager');
+const customProviderManager = require('../services/customProviderManager'); // <-- ADDED
 const pool = require('../config/db');
 
 const ADMIN_PASS = process.env.ADMIN_PASS || 'yomi123';
@@ -104,6 +105,32 @@ exports.deleteToken = async (req, res) => {
         res.status(204).send();
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete token.' });
+    }
+};
+
+// --- API: Custom Providers (NEW) ---
+exports.getCustomProviders = async (req, res) => {
+    try {
+        const providers = await customProviderManager.getAll();
+        res.json({ providers });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch custom providers.' });
+    }
+};
+exports.saveCustomProvider = async (req, res) => {
+    try {
+        await customProviderManager.save(req.body);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to save custom provider.', detail: error.message });
+    }
+};
+exports.deleteCustomProvider = async (req, res) => {
+    try {
+        await customProviderManager.remove(req.params.id);
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete custom provider.' });
     }
 };
 

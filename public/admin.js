@@ -392,6 +392,98 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     fetchTokens();
 
+    // --- Custom Provider Editor ---
+    const customProvidersList = document.getElementById('customProvidersList');
+    const providerForm = document.getElementById('provider-form');
+    const providerFormTitle = document.getElementById('provider-form-title');
+    let allCustomProviders = [];
+
+    async function fetchCustomProviders() {
+        try {
+            const data = await api('/custom-providers');
+            allCustomProviders = data.providers || [];
+            renderCustomProviders();
+        } catch (error) {
+            alert('Error fetching custom providers: ' + error.message);
+        }
+    }
+
+    function renderCustomProviders() {
+        customProvidersList.innerHTML = allCustomProviders.map(p => `
+            <div class="command-item">
+                <div class="cmd-info">
+                    <strong>${p.display_name}</strong> (<code>/${p.provider_id}</code>)
+                    <span style="color: ${p.is_enabled ? 'var(--green)' : 'var(--red)'};">
+                        (${p.is_enabled ? 'Enabled' : 'Disabled'})
+                    </span>
+                </div>
+                <div class="cmd-actions">
+                    <button class="btn-secondary" onclick="editCustomProvider(${p.id})">Edit</button>
+                    <button class="btn-secondary" onclick="deleteCustomProvider(${p.id})">Delete</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    window.editCustomProvider = (id) => {
+        const p = allCustomProviders.find(provider => provider.id == id);
+        if (!p) return;
+        providerFormTitle.textContent = 'Edit Provider';
+        document.getElementById('provider_id_hidden').value = p.id;
+        document.getElementById('provider_display_name').value = p.display_name;
+        document.getElementById('provider_id').value = p.provider_id;
+        document.getElementById('provider_api_base_url').value = p.api_base_url;
+        document.getElementById('provider_model_id').value = p.model_id;
+        document.getElementById('provider_model_display_name').value = p.model_display_name || '';
+        document.getElementById('provider_api_keys').value = p.api_keys || '';
+        document.getElementById('provider_enabled').value = p.is_enabled;
+    };
+
+    window.deleteCustomProvider = async (id) => {
+        if (!confirm('Are you sure you want to delete this provider? This will remove its endpoint immediately.')) return;
+        try {
+            await api(`/custom-providers/${id}`, { method: 'DELETE' });
+            fetchCustomProviders();
+            alert('Provider deleted. You may need to refresh the page for the changes to fully apply.');
+        } catch (error) {
+            alert('Error deleting provider: ' + error.message);
+        }
+    };
+
+    document.getElementById('provider_clear_btn').onclick = () => {
+        providerFormTitle.textContent = 'Add New Provider';
+        providerForm.reset();
+        document.getElementById('provider_id_hidden').value = '';
+    };
+
+    providerForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const body = {
+            id: document.getElementById('provider_id_hidden').value || null,
+            display_name: document.getElementById('provider_display_name').value,
+            provider_id: document.getElementById('provider_id').value,
+            api_base_url: document.getElementById('provider_api_base_url').value,
+            model_id: document.getElementById('provider_model_id').value,
+            model_display_name: document.getElementById('provider_model_display_name').value,
+            api_keys: document.getElementById('provider_api_keys').value,
+            is_enabled: document.getElementById('provider_enabled').value === 'true',
+        };
+
+        try {
+            await api('/custom-providers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            alert('Provider saved successfully! You may need to refresh the page for the changes to fully apply.');
+            document.getElementById('provider_clear_btn').click();
+            fetchCustomProviders();
+        } catch (error) {
+            alert('Error saving provider: ' + error.message);
+        }
+    };
+    fetchCustomProviders();
+
     // --- Import/Export ---
     document.getElementById('exportBtn').onclick = () => {
         const provider = document.getElementById('exportProviderSelector').value;

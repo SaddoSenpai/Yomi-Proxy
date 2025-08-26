@@ -12,7 +12,6 @@
         <h1>Yomi Proxy</h1>
         <p>This is a public proxy for various AI models. Use the endpoints below with your preferred client.</p>
         
-        <!-- NEW: Security Mode Display -->
         <div class="security-info">
             <strong>Security Mode:</strong> 
             <% if (securityMode === 'none') { %>
@@ -30,7 +29,12 @@
             <% providers.forEach(provider => { %>
                 <div class="provider-card">
                     <div class="provider-header">
-                        <h2><%= provider.name.charAt(0).toUpperCase() + provider.name.slice(1) %></h2>
+                        <!-- MODIFIED: Display logic for custom vs built-in -->
+                        <% if (provider.isCustom) { %>
+                            <h2><%= provider.displayName %></h2>
+                        <% } else { %>
+                            <h2><%= provider.name.charAt(0).toUpperCase() + provider.name.slice(1) %></h2>
+                        <% } %>
                     </div>
                     
                     <div class="endpoint-wrapper">
@@ -40,8 +44,13 @@
                     <button class="copy-btn" data-endpoint="<%= baseUrl %>/<%= provider.name %>/v1/chat/completions">Copy API Endpoint</button>
 
                     <div class="provider-details">
-                        <div><strong>Max Context:</strong> <span><%= provider.maxContext %></span></div>
-                        <div><strong>Max Output:</strong> <span><%= provider.maxOutput %></span></div>
+                        <!-- MODIFIED: Display logic for custom vs built-in -->
+                        <% if (provider.isCustom) { %>
+                            <div><strong>Model:</strong> <span><%= provider.modelDisplayName || provider.modelId %></span></div>
+                        <% } else { %>
+                            <div><strong>Max Context:</strong> <span><%= provider.maxContext %></span></div>
+                            <div><strong>Max Output:</strong> <span><%= provider.maxOutput %></span></div>
+                        <% } %>
                     </div>
                     <div class="provider-keys">
                         <span class="key-status active">Active: <%= provider.keys.active %></span>

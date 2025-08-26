@@ -15,7 +15,6 @@ const promptService = require('../services/promptService');
  */
 exports.proxyRequest = async (req, res, provider) => {
     const reqId = crypto.randomBytes(4).toString('hex');
-    // MODIFIED: Add token name to log if available
     const tokenUser = req.userTokenInfo ? ` (Token: ${req.userTokenInfo.name})` : '';
     console.log(`\n--- [${reqId}] New Request for Provider: ${provider}${tokenUser} ---`);
 
@@ -31,36 +30,43 @@ exports.proxyRequest = async (req, res, provider) => {
     const body = req.body;
     
     let forwardUrl, forwardBody, headers;
+    const providerConfig = keyManager.getProviderConfig(provider);
 
     try {
         const finalMessages = await promptService.buildFinalMessages(provider, body.messages, reqId);
 
         // --- Provider-Specific Request Building ---
-        switch (provider) {
-            case 'gemini':
-                forwardUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
-                const contents = finalMessages.map(m => ({
-                    role: m.role === 'assistant' ? 'model' : 'user',
-                    parts: [{ text: m.content || '' }]
-                }));
-                forwardBody = { contents, generation_config: { temperature: body.temperature, top_p: body.top_p } };
-                headers = { 'Content-Type': 'application/json' };
-                break;
-            
-            case 'deepseek':
-            case 'openai':
-            case 'openrouter':
-            case 'mistral':
-                forwardBody = { ...body, messages: finalMessages };
-                headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
-                if (provider === 'deepseek') forwardUrl = 'https://api.deepseek.com/chat/completions';
-                if (provider === 'openai') forwardUrl = 'https://api.openai.com/v1/chat/completions';
-                if (provider === 'openrouter') forwardUrl = 'https://openrouter.ai/api/v1/chat/completions';
-                if (provider === 'mistral') forwardUrl = 'https://api.mistral.ai/v1/chat/completions';
-                break;
+        if (providerConfig.isCustom) {
+            forwardUrl = `${providerConfig.apiBaseUrl}/v1/chat/completions`;
+            forwardBody = { ...body, messages: finalMessages, model: providerConfig.modelId };
+            headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
+        } else {
+            switch (provider) {
+                case 'gemini':
+                    forwardUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
+                    const contents = finalMessages.map(m => ({
+                        role: m.role === 'assistant' ? 'model' : 'user',
+                        parts: [{ text: m.content || '' }]
+                    }));
+                    forwardBody = { contents, generation_config: { temperature: body.temperature, top_p: body.top_p } };
+                    headers = { 'Content-Type': 'application/json' };
+                    break;
+                
+                case 'deepseek':
+                case 'openai':
+                case 'openrouter':
+                case 'mistral':
+                    forwardBody = { ...body, messages: finalMessages };
+                    headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
+                    if (provider === 'deepseek') forwardUrl = 'https://api.deepseek.com/chat/completions';
+                    if (provider === 'openai') forwardUrl = 'https://api.openai.com/v1/chat/completions';
+                    if (provider === 'openrouter') forwardUrl = 'https://openrouter.ai/api/v1/chat/completions';
+                    if (provider === 'mistral') forwardUrl = 'https://api.mistral.ai/v1/chat/completions';
+                    break;
 
-            default:
-                return res.status(400).json({ error: `Unsupported provider: ${provider}` });
+                default:
+                    return res.status(400).json({ error: `Unsupported provider: ${provider}` });
+            }
         }
 
         // --- Forward the Request ---

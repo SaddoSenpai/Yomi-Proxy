@@ -24,10 +24,15 @@ router.get('/api/commands', adminAuth, adminController.getCommands);
 router.post('/api/commands', adminAuth, adminController.saveCommand);
 router.delete('/api/commands/:id', adminAuth, adminController.deleteCommand);
 
-// User Tokens (NEW)
+// User Tokens
 router.get('/api/tokens', adminAuth, adminController.getTokens);
 router.post('/api/tokens', adminAuth, adminController.saveToken);
 router.delete('/api/tokens/:id', adminAuth, adminController.deleteToken);
+
+// Custom Providers (NEW)
+router.get('/api/custom-providers', adminAuth, adminController.getCustomProviders);
+router.post('/api/custom-providers', adminAuth, adminController.saveCustomProvider);
+router.delete('/api/custom-providers/:id', adminAuth, adminController.deleteCustomProvider);
 
 // Import/Export
 router.post('/api/import', adminAuth, adminController.importData);
