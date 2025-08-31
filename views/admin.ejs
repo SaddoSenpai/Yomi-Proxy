@@ -180,13 +180,21 @@
                         <form id="provider-form">
                             <input type="hidden" id="provider_id_hidden">
                             
+                            <!-- --- CLAUDE INTEGRATION: NEW FIELD --- -->
+                            <label for="provider_type">Provider Type</label>
+                            <select id="provider_type">
+                                <option value="openai">OpenAI-Compatible</option>
+                                <option value="claude">Anthropic Claude</option>
+                            </select>
+                            <p class="muted" style="margin-top: -10px; font-size: 0.8em;">Select 'Claude' for Anthropic models. This changes how the proxy communicates with the API.</p>
+
                             <label for="provider_display_name">Display Name (on main page)</label>
                             <input id="provider_display_name" placeholder="e.g., My Llama Provider" required>
                             
                             <label for="provider_id_input">Provider ID (for URL, no spaces/special chars)</label>
                             <input id="provider_id_input" placeholder="e.g., my-llama-provider" required pattern="[a-z0-9-]+" title="Only lowercase letters, numbers, and hyphens are allowed.">
                             
-                            <label for="provider_api_base_url">API Base URL (without /v1/chat/completions)</label>
+                            <label for="provider_api_base_url">API Base URL (without /v1/chat/completions or /v1/messages)</label>
                             <input id="provider_api_base_url" type="url" placeholder="https://api.example.com" required>
                             
                             <label for="provider_model_id">Actual Model ID (sent to the provider's API)</label>
@@ -199,7 +207,6 @@
                             <label for="provider_model_display_name">Model Display Name (optional)</label>
                             <input id="provider_model_display_name" placeholder="e.g., Llama 3 8B Instruct">
                             
-                            <!-- --- NEW: Max Tokens Fields --- -->
                             <label for="provider_max_context_tokens">Max Context Tokens (optional)</label>
                             <input id="provider_max_context_tokens" type="number" placeholder="e.g., 8192">
 

@@ -20,7 +20,7 @@ async function initialize() {
     state.providers = {}; // Clear existing providers before re-loading
 
     // 1. Load built-in providers from .env
-    const supportedProviders = ['GEMINI', 'DEEPSEEK', 'OPENAI', 'OPENROUTER', 'MISTRAL'];
+    const supportedProviders = ['GEMINI', 'DEEPSEEK', 'OPENAI', 'OPENROUTER', 'MISTRAL', 'CLAUDE'];
     for (const provider of supportedProviders) {
         const keysEnv = process.env[`${provider}_KEY`];
         if (keysEnv) {
@@ -36,6 +36,9 @@ async function initialize() {
                     currentIndex: 0,
                     config: {
                         isCustom: false,
+                        providerType: providerName === 'claude' ? 'claude' : 'openai',
+                        apiBaseUrl: providerName === 'claude' ? 'https://api.anthropic.com' : null,
+                        modelId: providerName === 'claude' ? 'claude-3-opus-20240229' : null,
                         maxContext: process.env[`MAX_CONTEXT_${provider}`] || 'Unlimited',
                         maxOutput: process.env[`MAX_OUTPUT_${provider}`] || 'Unlimited',
                     }
@@ -60,12 +63,12 @@ async function initialize() {
                     currentIndex: 0,
                     config: {
                         isCustom: true,
+                        providerType: provider.provider_type || 'openai',
                         displayName: provider.display_name,
                         modelDisplayName: provider.model_display_name,
-                        apiBaseUrl: provider.api_base_url.replace(/\/$/, ''), // Remove trailing slash
+                        apiBaseUrl: provider.api_base_url.replace(/\/$/, ''),
                         modelId: provider.model_id,
                         enforcedModelName: provider.enforced_model_name,
-                        // --- NEW: Load token limits from DB ---
                         maxContext: provider.max_context_tokens || 'Unlimited',
                         maxOutput: provider.max_output_tokens || 'Unlimited',
                     }
@@ -80,12 +83,49 @@ async function initialize() {
     console.log('[Key Manager] Initialization complete.');
 }
 
+// --- MODIFIED: The function now accepts providerConfig to use the correct URL and Model ---
+async function testClaudeKey(providerConfig, key) {
+    const testUrl = `${providerConfig.apiBaseUrl}/v1/messages`;
+    const testPayload = {
+        model: providerConfig.modelId, // Use the model from the config
+        messages: [{ role: 'user', content: 'hello' }],
+        max_tokens: 2
+    };
+    const headers = {
+        'Content-Type': 'application/json',
+        'x-api-key': key.value,
+        'anthropic-version': '2023-06-01'
+    };
+
+    try {
+        await axios.post(testUrl, testPayload, { headers, timeout: 10000 });
+        key.status = 'active';
+    } catch (error) {
+        const status = error.response?.status;
+        if (status === 401 || status === 403) {
+            key.status = 'revoked';
+        } else if (status === 402) {
+            key.status = 'over_quota';
+        } else {
+            key.status = 'revoked';
+            console.warn(`[Key Test] Claude key for provider '${providerConfig.displayName}' failed with status ${status || 'N/A'}. Error: ${error.message}`);
+        }
+    }
+}
+
+
 /**
  * Tests a single API key for a custom provider.
  * @param {object} providerConfig - The configuration for the custom provider.
  * @param {object} key - The key object to test.
  */
 async function testCustomKey(providerConfig, key) {
+    if (providerConfig.providerType === 'claude') {
+        // --- MODIFIED: Pass the full providerConfig to the test function ---
+        return await testClaudeKey(providerConfig, key);
+    }
+    
+    // Default to OpenAI-compatible test
     const testUrl = `${providerConfig.apiBaseUrl}/v1/chat/completions`;
     const testPayload = {
         model: providerConfig.modelId,
@@ -125,6 +165,10 @@ async function testKey(provider, key) {
 
     try {
         switch (provider) {
+            case 'claude':
+                // --- MODIFIED: Pass the config for the built-in provider as well ---
+                const claudeConfig = state.providers['claude'].config;
+                return await testClaudeKey(claudeConfig, key);
             case 'gemini':
                 testUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`;
                 testPayload = { contents: [{ parts: [{ text: "hello" }] }] };
@@ -151,7 +195,7 @@ async function testKey(provider, key) {
                 headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` };
                 break;
             default:
-                key.status = 'revoked'; // Should not happen for built-ins
+                key.status = 'revoked';
                 return;
         }
 
@@ -217,7 +261,11 @@ function getRotatingKey(provider) {
  * @returns {object|null}
  */
 function getProviderConfig(provider) {
-    return state.providers[provider]?.config || null;
+    const config = state.providers[provider]?.config || null;
+    if (config) {
+        return { ...config, name: provider };
+    }
+    return null;
 }
 
 function deactivateKey(provider, keyValue, reason) {
@@ -263,7 +311,7 @@ function getProviderStats() {
         const providerData = state.providers[providerName];
         stats[providerName] = {
             ...providerData.config,
-            name: providerName, // This is the provider_id for custom providers
+            name: providerName,
             keys: {
                 active: providerData.keys.filter(k => k.status === 'active').length,
                 over_quota: providerData.keys.filter(k => k.status === 'over_quota').length,

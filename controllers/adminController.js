@@ -120,9 +120,10 @@ exports.getCustomProviders = async (req, res) => {
 
 exports.saveCustomProvider = async (req, res) => {
     try {
-        // --- MODIFIED: Explicitly destructure all expected fields for clarity and security ---
+        // --- CLAUDE INTEGRATION: Destructure the new provider_type field ---
         const {
             id,
+            provider_type,
             provider_id,
             display_name,
             api_base_url,
@@ -137,6 +138,7 @@ exports.saveCustomProvider = async (req, res) => {
 
         const providerData = {
             id,
+            provider_type,
             provider_id,
             display_name,
             api_base_url,

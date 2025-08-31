@@ -413,6 +413,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="command-item">
                 <div class="cmd-info">
                     <strong>${p.display_name}</strong> (<code>/${p.provider_id}</code>)
+                    <!-- CLAUDE INTEGRATION: Display provider type -->
+                    <span style="color: var(--text-muted); font-size: 0.9em;">[${p.provider_type || 'openai'}]</span>
                     <span style="color: ${p.is_enabled ? 'var(--green)' : 'var(--red)'};">
                         (${p.is_enabled ? 'Enabled' : 'Disabled'})
                     </span>
@@ -430,13 +432,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!p) return;
         providerFormTitle.textContent = 'Edit Provider';
         document.getElementById('provider_id_hidden').value = p.id;
+        // --- CLAUDE INTEGRATION: Set provider type dropdown ---
+        document.getElementById('provider_type').value = p.provider_type || 'openai';
         document.getElementById('provider_display_name').value = p.display_name;
         document.getElementById('provider_id_input').value = p.provider_id;
         document.getElementById('provider_api_base_url').value = p.api_base_url;
         document.getElementById('provider_model_id').value = p.model_id;
-        // --- MODIFIED: Populate the new field ---
         document.getElementById('provider_enforced_model_name').value = p.enforced_model_name || '';
         document.getElementById('provider_model_display_name').value = p.model_display_name || '';
+        document.getElementById('provider_max_context_tokens').value = p.max_context_tokens || '';
+        document.getElementById('provider_max_output_tokens').value = p.max_output_tokens || '';
         document.getElementById('provider_api_keys').value = p.api_keys || '';
         document.getElementById('provider_enabled').value = p.is_enabled;
     };
@@ -446,7 +451,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             await api(`/custom-providers/${id}`, { method: 'DELETE' });
             fetchCustomProviders();
-            alert('Provider deleted. Please REFRESH the page for the changes to fully apply.');
+            alert('Provider deleted. Please RESTART the server for the changes to fully apply.');
         } catch (error) {
             alert('Error deleting provider: ' + error.message);
         }
@@ -462,13 +467,16 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const body = {
             id: document.getElementById('provider_id_hidden').value || null,
+            // --- CLAUDE INTEGRATION: Get provider type from form ---
+            provider_type: document.getElementById('provider_type').value,
             display_name: document.getElementById('provider_display_name').value,
             provider_id: document.getElementById('provider_id_input').value,
             api_base_url: document.getElementById('provider_api_base_url').value,
             model_id: document.getElementById('provider_model_id').value,
-            // --- MODIFIED: Send the new field to the backend ---
-            enforced_model_name: document.getElementById('provider_enforced_model_name').value.trim() || null, // Send null if empty
+            enforced_model_name: document.getElementById('provider_enforced_model_name').value.trim() || null,
             model_display_name: document.getElementById('provider_model_display_name').value,
+            max_context_tokens: document.getElementById('provider_max_context_tokens').value || null,
+            max_output_tokens: document.getElementById('provider_max_output_tokens').value || null,
             api_keys: document.getElementById('provider_api_keys').value,
             is_enabled: document.getElementById('provider_enabled').value === 'true',
         };
@@ -479,7 +487,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
             });
-            alert('Provider saved successfully! Please REFRESH the page for the changes to fully apply.');
+            alert('Provider saved successfully! Please RESTART the server for the changes to fully apply.');
             document.getElementById('provider_clear_btn').click();
             fetchCustomProviders();
         } catch (error) {
@@ -498,7 +506,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const fileInput = document.getElementById('importFile');
         if (fileInput.files.length === 0) return alert('Please select a file to import.');
 
-        // --- MODIFIED: Get target provider and send as query param ---
         const provider = document.getElementById('importProviderSelector').value;
         if (!provider) return alert('Please select a provider to import the configuration to.');
 
