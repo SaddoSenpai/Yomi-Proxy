@@ -213,7 +213,8 @@ button:disabled {
 .block-header {
     display: flex;
     align-items: center;
-    gap: 10px;
+    justify-content: space-between; /* MODIFIED */
+    gap: 15px; /* MODIFIED */
 }
 .block-info {
     flex-grow: 1;
@@ -228,9 +229,20 @@ button:disabled {
     color: var(--text-muted);
     font-size: 0.8em;
 }
+
+/* --- REORDERING: MODIFIED FOR NEW LAYOUT --- */
 .block-actions {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    gap: 15px; /* Space between movement and edit buttons */
+    flex-shrink: 0; /* Prevent buttons from shrinking */
+}
+.block-actions .move-controls {
+    display: flex;
+    gap: 8px;
+}
+.block-actions .edit-controls {
+    display: flex;
     gap: 8px;
 }
 .block-actions button {
@@ -239,6 +251,17 @@ button:disabled {
     width: 80px;
     text-align: center;
 }
+/* --- REORDERING: Style for the new arrow buttons --- */
+.block-actions .btn-move {
+    width: 35px;
+    height: 35px;
+    padding: 5px;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .block-editor {
     display: none;
     margin-top: 15px;
@@ -270,8 +293,9 @@ button:disabled {
 /* Command Editor Styles */
 .command-editor { display: grid; grid-template-columns: 1fr; gap: 20px; }
 .command-list-wrapper, .command-form-wrapper { background-color: var(--bg-card); padding: 20px; border-radius: 12px; }
-#commandsList, #tokensList { max-height: 400px; overflow-y: auto; }
-.command-item { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+#commandsList, #tokensList, #customProvidersList { max-height: 400px; overflow-y: auto; } /* MODIFIED: Applied to all lists */
+.command-item { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border-color); }
+.command-item:last-child { border-bottom: none; }
 .command-item .cmd-info { font-size: 0.9em; }
 .command-item .cmd-info code { color: var(--orange); }
 .command-item .cmd-actions button { font-size: 0.8em; padding: 4px 8px; margin-left: 5px; }
@@ -305,6 +329,16 @@ button:disabled {
     .command-editor, .io-grid {
         grid-template-columns: 1fr;
     }
+    /* --- REORDERING: Stack block actions on mobile --- */
+    .block-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .block-actions {
+        width: 100%;
+        justify-content: space-between;
+        margin-top: 10px;
+    }
 }
 
 @media (min-width: 769px) {
@@ -333,7 +367,7 @@ button:disabled {
 }
 .token-value-wrapper {
     margin-top: 10px;
-    margin-bottom: 15px; /* Add space between token items */
+    margin-bottom: 15px;
     background-color: var(--bg-dark);
     padding: 10px;
     border-radius: 6px;

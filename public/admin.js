@@ -116,8 +116,19 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span class="block-role">(${block.role}) ${isInjection ? '[Injection Point]' : ''}</span>
                     </div>
                     <div class="block-actions">
-                        <button class="btn-secondary" onclick="toggleEdit(${index})">${isEditing ? 'Cancel' : 'Edit'}</button>
-                        <button class="btn-secondary" style="background-color: var(--red);" onclick="deleteBlock(${index})">Delete</button>
+                        <!-- --- REORDERING: NEW move controls --- -->
+                        <div class="move-controls">
+                            <button class="btn-secondary btn-move" onclick="moveBlock(${index}, -1)" ${index === 0 ? 'disabled' : ''}>
+                                <i class='bx bx-up-arrow-alt'></i>
+                            </button>
+                            <button class="btn-secondary btn-move" onclick="moveBlock(${index}, 1)" ${index === currentBlocks.length - 1 ? 'disabled' : ''}>
+                                <i class='bx bx-down-arrow-alt'></i>
+                            </button>
+                        </div>
+                        <div class="edit-controls">
+                            <button class="btn-secondary" onclick="toggleEdit(${index})">${isEditing ? 'Cancel' : 'Edit'}</button>
+                            <button class="btn-secondary" style="background-color: var(--red);" onclick="deleteBlock(${index})">Delete</button>
+                        </div>
                     </div>
                 </div>
                 <div class="block-editor">
@@ -145,6 +156,29 @@ document.addEventListener('DOMContentLoaded', () => {
             blocksList.appendChild(el);
         });
     }
+    
+    // --- REORDERING: NEW function to move blocks ---
+    window.moveBlock = (index, direction) => {
+        const newIndex = index + direction;
+
+        // Boundary check
+        if (newIndex < 0 || newIndex >= currentBlocks.length) {
+            return;
+        }
+
+        // Swap elements using array destructuring
+        [currentBlocks[index], currentBlocks[newIndex]] = [currentBlocks[newIndex], currentBlocks[index]];
+        
+        // If we were editing the block that moved, update the index
+        if(currentlyEditingIndex === index) {
+            currentlyEditingIndex = newIndex;
+        } else if (currentlyEditingIndex === newIndex) {
+            currentlyEditingIndex = index;
+        }
+
+        renderBlocks();
+        updateSaveButtonState();
+    };
 
     window.toggleEdit = (index) => {
         currentlyEditingIndex = (currentlyEditingIndex === index) ? -1 : index;
@@ -413,7 +447,6 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="command-item">
                 <div class="cmd-info">
                     <strong>${p.display_name}</strong> (<code>/${p.provider_id}</code>)
-                    <!-- CLAUDE INTEGRATION: Display provider type -->
                     <span style="color: var(--text-muted); font-size: 0.9em;">[${p.provider_type || 'openai'}]</span>
                     <span style="color: ${p.is_enabled ? 'var(--green)' : 'var(--red)'};">
                         (${p.is_enabled ? 'Enabled' : 'Disabled'})
@@ -432,7 +465,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!p) return;
         providerFormTitle.textContent = 'Edit Provider';
         document.getElementById('provider_id_hidden').value = p.id;
-        // --- CLAUDE INTEGRATION: Set provider type dropdown ---
         document.getElementById('provider_type').value = p.provider_type || 'openai';
         document.getElementById('provider_display_name').value = p.display_name;
         document.getElementById('provider_id_input').value = p.provider_id;
@@ -467,7 +499,6 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const body = {
             id: document.getElementById('provider_id_hidden').value || null,
-            // --- CLAUDE INTEGRATION: Get provider type from form ---
             provider_type: document.getElementById('provider_type').value,
             display_name: document.getElementById('provider_display_name').value,
             provider_id: document.getElementById('provider_id_input').value,
