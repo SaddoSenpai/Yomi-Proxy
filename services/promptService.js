@@ -10,7 +10,6 @@ class UserInputError extends Error {
   }
 }
 
-// --- MODIFIED: Corrected parsing logic ---
 function parseJanitorInput(incomingMessages) {
   let characterName = 'Character';
   let characterInfo = '';
@@ -19,7 +18,6 @@ function parseJanitorInput(incomingMessages) {
   let summaryInfo = '';
   const fullContent = (incomingMessages || []).map(m => m.content || '').join('\n\n');
   
-  // FIX: Corrected Regex to allow spaces in character names
   const charRegex = /<(.+?)'s Persona>([\s\S]*?)<\/\1's Persona>/;
   const charMatch = fullContent.match(charRegex);
   if (charMatch) {
@@ -45,7 +43,6 @@ function parseJanitorInput(incomingMessages) {
     summaryInfo = summaryMatch[1].trim();
   }
 
-  // NEW: Advanced history cleaning logic
   const chatHistory = (incomingMessages || [])
     .filter(m => {
         const content = m.content || '';
@@ -54,17 +51,13 @@ function parseJanitorInput(incomingMessages) {
     .map(m => {
         if (m.role === 'assistant' && m.content && m.content.includes('<w>')) {
             console.log('[History Cleaning] Found <w> tag in assistant message. Cleaning for next prompt.');
-            return {
-                ...m,
-                content: m.content.split('<w>').pop().trim()
-            };
+            return { ...m, content: m.content.split('<w>').pop().trim() };
         }
         return m;
     });
 
   return { characterName, characterInfo, userInfo, scenarioInfo, summaryInfo, chatHistory };
 }
-
 
 function parseCommandsFromMessages(messages) {
     if (!messages || messages.length === 0) return [];
@@ -81,15 +74,15 @@ async function getCommandDefinitions(commandTags) {
 }
 
 /**
- * MODIFIED: The complete, corrected prompt building logic.
+ * --- REWRITTEN FROM SCRATCH (FINAL): The definitive prompt building logic. ---
+ * This version uses a robust single-pass process to guarantee positional integrity.
+ * It directly builds the final message array in the correct order.
  */
 async function buildFinalMessages(provider, incomingMessages, reqId) {
-    let effectiveProvider = provider;
     let structureToUse = await getStructure(provider);
     if (structureToUse.length === 0 && provider !== 'default') {
         console.log(`[${reqId}] No structure for '${provider}', falling back to 'default'.`);
         structureToUse = await getStructure('default');
-        effectiveProvider = 'default';
     }
 
     if (structureToUse.length === 0) {
@@ -97,57 +90,25 @@ async function buildFinalMessages(provider, incomingMessages, reqId) {
         return incomingMessages;
     }
     
-    console.log(`[${reqId}] Processing request with global structure for provider: ${effectiveProvider}`);
-
-    // --- MODIFIED: More detailed placeholder validation ---
-    const fullConfigContent = structureToUse.map(b => b.content || '').join('');
-    const requiredPlaceholders = ['<<CHARACTER_INFO>>', '<<SCENARIO_INFO>>', '<<USER_INFO>>', '<<CHAT_HISTORY>>', '<<SUMMARY>>'];
-    const missingPlaceholders = requiredPlaceholders.filter(p => !fullConfigContent.includes(p));
-
-    if (missingPlaceholders.length > 0) {
-        const errorDetail = `The active prompt configuration for provider '${effectiveProvider}' is invalid. It must contain all five placeholders, but is missing: ${missingPlaceholders.join(', ')}.`;
-        console.error(`[${reqId}] ${errorDetail}`);
-        throw new Error(errorDetail);
-    }
+    console.log(`[${reqId}] Processing request with global structure for provider: ${provider}`);
 
     const { characterName, characterInfo, userInfo, scenarioInfo, summaryInfo, chatHistory } = parseJanitorInput(incomingMessages);
-    console.log(`[${reqId}] Parsed Character Name: ${characterName}`);
-    
     const commandTags = parseCommandsFromMessages(incomingMessages);
     const commandDefinitions = await getCommandDefinitions(commandTags);
 
     const prefillCommands = commandDefinitions.filter(cmd => cmd.command_type === 'Prefill');
     if (prefillCommands.length > 1) {
-        const conflictingTags = prefillCommands.map(cmd => `<${cmd.command_tag}>`).join(', ');
-        throw new UserInputError(`Error: Only 1 Prefill command is allowed. Found: ${conflictingTags}.`);
+        throw new UserInputError(`Error: Only 1 Prefill command is allowed. Found: ${prefillCommands.map(cmd => `<${cmd.command_tag}>`).join(', ')}.`);
     }
     const hasPrefillCommand = prefillCommands.length > 0;
-
+    
     const commandsByType = { 'Jailbreak': [], 'Additional Commands': [], 'Prefill': [] };
-    if (commandDefinitions.length > 0) {
-        console.log(`[${reqId}] Found commands: ${commandTags.join(', ')}. Injecting blocks.`);
-        commandDefinitions.forEach(cmd => {
-            if (commandsByType[cmd.command_type]) {
-                commandsByType[cmd.command_type].push({
-                    name: cmd.block_name, role: cmd.block_role, content: cmd.block_content,
-                });
-            }
-        });
-    }
-
-    const finalStructure = [];
-    for (const block of structureToUse) {
-        if (block.block_type === 'Conditional Prefill') {
-            if (!hasPrefillCommand) finalStructure.push(block);
-        } else if (block.block_type !== 'Standard') {
-            const commandsToInject = commandsByType[block.block_type];
-            if (commandsToInject?.length > 0) finalStructure.push(...commandsToInject);
-        } else {
-            finalStructure.push(block);
+    commandDefinitions.forEach(cmd => {
+        if (commandsByType[cmd.command_type]) {
+            commandsByType[cmd.command_type].push({ role: cmd.block_role, content: cmd.block_content });
         }
-    }
-
-    const finalMessages = [];
+    });
+    
     const replacer = (text) => text
         .replace(/{{char}}/g, characterName)
         .replace(/<<CHARACTER_INFO>>/g, characterInfo)
@@ -155,30 +116,62 @@ async function buildFinalMessages(provider, incomingMessages, reqId) {
         .replace(/<<USER_INFO>>/g, userInfo)
         .replace(/<<SUMMARY>>/g, summaryInfo);
 
-    for (const block of finalStructure) {
-        let currentContent = block.content || '';
-        if (currentContent.includes('<<CHAT_HISTORY>>')) {
-            const parts = currentContent.split('<<CHAT_HISTORY>>');
-            if (parts[0].trim()) {
-                finalMessages.push({ role: block.role, content: replacer(parts[0]) });
-            }
-            finalMessages.push(...chatHistory);
-            if (parts[1].trim()) {
-                finalMessages.push({ role: block.role, content: replacer(parts[1]) });
-            }
+    const finalMessages = [];
+    let historyInjected = false;
+
+    // This single loop iterates through the structure from the database in the correct order.
+    for (const block of structureToUse) {
+        const blockType = block.block_type;
+
+        // Determine the source of content for this position in the structure.
+        // It's either the block itself or a list of commands for injection points.
+        let contentSource = [];
+        if (blockType === 'Conditional Prefill' && hasPrefillCommand) {
+            continue; // Skip this block entirely if a prefill command is active.
+        } else if (['Jailbreak', 'Additional Commands', 'Prefill'].includes(blockType)) {
+            contentSource = commandsByType[blockType] || [];
         } else {
-            currentContent = replacer(currentContent);
-            if (currentContent.trim()) {
-                finalMessages.push({ role: block.role, content: currentContent });
+            contentSource = [block]; // Standard block or a Conditional Prefill that should run.
+        }
+
+        // Process each item for this position. (Usually just one, but can be multiple for injections).
+        for (const item of contentSource) {
+            const content = replacer(item.content || '');
+            const role = item.role;
+
+            // The highest priority is to check for and inject the chat history.
+            if (content.includes('<<CHAT_HISTORY>>')) {
+                const parts = content.split('<<CHAT_HISTORY>>');
+                if (parts[0].trim()) {
+                    finalMessages.push({ role, content: parts[0] });
+                }
+                finalMessages.push(...chatHistory);
+                if (parts[1].trim()) {
+                    finalMessages.push({ role, content: parts[1] });
+                }
+                historyInjected = true;
+            } else {
+                // If no history placeholder, just add the content.
+                if (content.trim()) {
+                    finalMessages.push({ role, content });
+                }
             }
         }
+    }
+
+    // Fallback: If the user forgot to include the placeholder in their structure,
+    // append the history to the very end to prevent it from being lost.
+    if (!historyInjected) {
+        console.warn(`[${reqId}] <<CHAT_HISTORY>> placeholder not found in structure. Appending history to the end.`);
+        finalMessages.push(...chatHistory);
     }
     
     console.log(`[${reqId}] Prompt construction complete. Final message count: ${finalMessages.length}`);
     return finalMessages;
 }
 
-// --- Database functions for structure and commands (unchanged) ---
+
+// --- Database functions (unchanged) ---
 async function getStructure(provider) {
     const res = await pool.query('SELECT * FROM global_prompt_blocks WHERE provider = $1 ORDER BY position', [provider]);
     return res.rows;

@@ -10,6 +10,7 @@ const fileUpload = require('express-fileupload');
 const cors = require('cors');
 const keyManager = require('./services/keyManager');
 const tokenManager = require('./services/tokenManager');
+const logService = require('./services/logService'); // <-- 1. IMPORT THE NEW SERVICE
 const mainRoutes = require('./routes/mainRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const proxyController = require('./controllers/proxyController');
@@ -94,6 +95,7 @@ async function startServer() {
     // Initialize managers that load data into memory
     await tokenManager.initialize();
     await keyManager.initialize();
+    await logService.initialize(); // <-- 2. INITIALIZE THE LOGGER
     await keyManager.checkAllKeys();
 
     app.listen(PORT, () => {
