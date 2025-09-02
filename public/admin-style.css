@@ -303,47 +303,6 @@ button:disabled {
 .io-card { background-color: var(--bg-card); padding: 25px; border-radius: 12px; }
 #importFile { padding: 5px; }
 
-/* Mobile Responsive Styles */
-@media (max-width: 768px) {
-    .sidebar {
-        transform: translateX(-100%);
-        width: 260px;
-    }
-    .sidebar.open {
-        transform: translateX(0);
-    }
-    .sidebar.close {
-        transform: translateX(-100%);
-        width: 260px;
-    }
-    .home-section {
-        width: 100%;
-        left: 0;
-    }
-    .sidebar.close ~ .home-section {
-        width: 100%;
-        left: 0;
-    }
-    .command-editor, .io-grid {
-        grid-template-columns: 1fr;
-    }
-    .block-header {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-    .block-actions {
-        width: 100%;
-        justify-content: space-between;
-        margin-top: 10px;
-    }
-}
-
-@media (min-width: 769px) {
-    .command-editor, .io-grid {
-        grid-template-columns: 1fr 1fr;
-    }
-}
-
 /* Token Editor Styles */
 .input-with-copy {
     display: flex;
@@ -401,21 +360,37 @@ button:disabled {
     padding: 25px;
     border-radius: 12px;
 }
-.radio-group {
-    margin-bottom: 15px;
-}
-.radio-group label {
-    font-weight: 500;
-    margin-left: 8px;
-}
-.radio-group .muted {
-    margin-left: 25px;
-    margin-top: 2px;
-    margin-bottom: 0;
-    font-size: 0.9em;
-}
 #log_purge_hours {
     max-width: 150px;
+}
+
+/* Log Settings UI */
+.hidden-radio {
+    display: none;
+}
+.log-setting-option {
+    background-color: var(--bg-dark);
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: border-color 0.3s, background-color 0.3s;
+}
+.log-setting-option:hover {
+    border-color: var(--accent-primary);
+}
+.log-setting-option.active {
+    border-color: var(--blue);
+    background-color: rgba(62, 100, 255, 0.1);
+}
+.log-setting-option h4 {
+    margin: 0 0 5px 0;
+    color: var(--text-light);
+}
+.log-setting-option .muted {
+    margin: 0;
+    font-size: 0.9em;
 }
 
 .logs-container {
@@ -425,9 +400,9 @@ button:disabled {
 }
 .logs-table .log-row {
     display: grid;
-    grid-template-columns: 80px 1fr 1fr 2fr 1fr;
+    grid-template-columns: 80px 1.5fr 1fr minmax(160px, auto) minmax(90px, auto);
     gap: 15px;
-    padding: 12px 0;
+    padding: 12px 10px;
     border-bottom: 1px solid var(--border-color);
     align-items: center;
     font-size: 0.9em;
@@ -437,10 +412,23 @@ button:disabled {
     color: var(--text-muted);
     border-bottom-width: 2px;
 }
+.log-row > div {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.log-row .log-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    justify-content: center;
+    overflow: visible;
+}
 .log-actions button {
     font-size: 0.9em;
     padding: 4px 8px;
-    margin-right: 5px;
+    margin: 0;
+    width: 100%;
 }
 .status-code {
     padding: 3px 8px;
@@ -513,4 +501,55 @@ button:disabled {
     white-space: pre-wrap;
     word-wrap: break-word;
     font-size: 0.85em;
+}
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(-100%);
+        width: 260px;
+    }
+    .sidebar.open {
+        transform: translateX(0);
+    }
+    .sidebar.close {
+        transform: translateX(-100%);
+        width: 260px;
+    }
+    .home-section {
+        width: 100%;
+        left: 0;
+    }
+    .sidebar.close ~ .home-section {
+        width: 100%;
+        left: 0;
+    }
+    .command-editor, .io-grid {
+        grid-template-columns: 1fr;
+    }
+    .block-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .block-actions {
+        width: 100%;
+        justify-content: space-between;
+        margin-top: 10px;
+    }
+
+    /* NEW: Mobile styles for logs table */
+    .logs-table .mobile-hidden {
+        display: none;
+    }
+    .logs-table .log-row {
+        grid-template-columns: 60px 1fr minmax(80px, auto);
+        gap: 10px;
+        padding: 12px 5px;
+    }
+}
+
+@media (min-width: 769px) {
+    .command-editor, .io-grid {
+        grid-template-columns: 1fr 1fr;
+    }
 }

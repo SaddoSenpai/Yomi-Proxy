@@ -142,7 +142,7 @@ async function updateLogSettings(mode, purgeHours) {
 
         // Update in-memory state
         state.mode = mode;
-        state.purgeHours = purgeHours;
+        state.purgeHours = parseInt(purgeHours, 10) || 24; // Ensure value is an integer
         
         // Adjust purge timer based on new settings
         stopPurgeTimer();

@@ -525,6 +525,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const logsPagination = document.getElementById('logsPagination');
     const logSettingsForm = document.getElementById('log-settings-form');
     const purgeHoursWrapper = document.getElementById('purge-hours-wrapper');
+    const logSettingOptions = document.querySelectorAll('.log-setting-option');
     let currentPage = 1;
 
     async function fetchLogs(page = 1) {
@@ -546,16 +547,16 @@ document.addEventListener('DOMContentLoaded', () => {
         logsTable.innerHTML = `
             <div class="log-row header">
                 <div>Status</div>
-                <div>Provider</div>
-                <div>Token Name</div>
+                <div class="mobile-hidden">Provider</div>
+                <div class="mobile-hidden">Token Name</div>
                 <div>Timestamp</div>
                 <div>Actions</div>
             </div>
             ${logs.map(log => `
                 <div class="log-row">
                     <div><span class="status-code s-${String(log.status_code).charAt(0)}">${log.status_code}</span></div>
-                    <div>${log.provider}</div>
-                    <div>${log.token_name}</div>
+                    <div class="mobile-hidden">${log.provider}</div>
+                    <div class="mobile-hidden">${log.token_name}</div>
                     <div>${new Date(log.created_at).toLocaleString()}</div>
                     <div class="log-actions">
                         <button class="btn-secondary" onclick="viewLogDetails(${log.id})">Details</button>
@@ -600,25 +601,50 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Log Settings
+    // --- Log Settings (REWRITTEN FOR RELIABILITY) ---
+    function togglePurgeHoursVisibility() {
+        const selectedMode = document.querySelector('input[name="log_mode"]:checked').value;
+        purgeHoursWrapper.style.display = selectedMode === 'auto_purge' ? 'block' : 'none';
+    }
+
     async function fetchLogSettings() {
         try {
             const settings = await api('/logging-settings');
-            document.querySelector(`input[name="log_mode"][value="${settings.logging_mode}"]`).checked = true;
-            document.getElementById('log_purge_hours').value = settings.logging_purge_hours;
+            const mode = settings.logging_mode || 'disabled';
+            
+            // Check the correct hidden radio button
+            const radioToSelect = document.getElementById(`log-${mode}`);
+            if (radioToSelect) radioToSelect.checked = true;
+            
+            // Update the visual style of the options
+            logSettingOptions.forEach(opt => {
+                opt.classList.toggle('active', opt.dataset.value === mode);
+            });
+
+            document.getElementById('log_purge_hours').value = settings.logging_purge_hours || 24;
+            
+            // Finally, update the visibility of the purge hours input
             togglePurgeHoursVisibility();
         } catch (error) {
             showAlert('Error fetching log settings: ' + error.message, true);
         }
     }
 
-    function togglePurgeHoursVisibility() {
-        const selectedMode = document.querySelector('input[name="log_mode"]:checked').value;
-        purgeHoursWrapper.style.display = selectedMode === 'auto_purge' ? 'block' : 'none';
-    }
+    // Add click listeners to the styled options
+    logSettingOptions.forEach(option => {
+        option.addEventListener('click', () => {
+            const value = option.dataset.value;
+            // Check the underlying radio button
+            const radio = document.getElementById(`log-${value}`);
+            if (radio) radio.checked = true;
+            
+            // Update visual styles
+            logSettingOptions.forEach(opt => opt.classList.remove('active'));
+            option.classList.add('active');
 
-    document.querySelectorAll('input[name="log_mode"]').forEach(radio => {
-        radio.addEventListener('change', togglePurgeHoursVisibility);
+            // Directly call the visibility function
+            togglePurgeHoursVisibility();
+        });
     });
 
     logSettingsForm.onsubmit = async (e) => {
