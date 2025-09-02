@@ -11,76 +11,45 @@ const logService = require('../services/logService');
 /**
  * --- REWRITTEN & CORRECTED ---
  * This function takes the final, ordered message array from promptService and
- * intelligently formats it for the Claude Messages API, preserving the position
- * of the <<CHAT_HISTORY>> placeholder and other mid-conversation instructions.
- *
- * It addresses the issue where system messages were always hoisted to the top.
- * Now, only leading system messages are put into the 'system' parameter. Any
- * system message appearing later in the sequence is merged into the next 'user'
- * message, preserving its intended position in the conversation flow.
+ * correctly formats it into the modern Claude Messages API structure with Content Blocks.
  */
 function formatFinalMessagesForClaude(finalMessages) {
-    const system_prompt_parts = [];
-    const intermediate_messages = [];
+    const system_blocks = [];
+    const message_blocks = [];
 
-    // 1. Separate leading system messages from the main conversation body.
-    let conversation_started = false;
     for (const message of finalMessages) {
-        if (!conversation_started && message.role === 'system') {
-            system_prompt_parts.push(message.content);
-        } else {
-            conversation_started = true;
-            intermediate_messages.push({ ...message });
-        }
-    }
-
-    // 2. Merge any mid-conversation system messages into the next user message.
-    const merged_messages = [];
-    let system_content_buffer = [];
-    for (const message of intermediate_messages) {
-        if (message.role === 'system') {
-            system_content_buffer.push(message.content);
-        } else {
-            if (system_content_buffer.length > 0 && message.role === 'user') {
-                const merged_system_content = system_content_buffer.join('\n\n');
-                message.content = `${merged_system_content}\n\n${message.content}`;
-                system_content_buffer = []; // Clear the buffer
-            }
-            merged_messages.push(message);
-        }
-    }
-
-    // 3. Sanitize for Claude's strict user/assistant alternation rule.
-    const final_message_blocks = [];
-    for (const message of merged_messages) {
         // Skip any empty messages that might have slipped through.
         if (!message.content || typeof message.content !== 'string' || message.content.trim() === '') {
             continue;
         }
 
-        const lastMessage = final_message_blocks[final_message_blocks.length - 1];
-        if (lastMessage && lastMessage.role === message.role) {
-            // If the role is the same as the last one, merge the content.
-            lastMessage.content = `${lastMessage.content}\n\n${message.content}`;
-        } else {
-            // Otherwise, add the new message object.
-            final_message_blocks.push({
+        if (message.role === 'system') {
+            // Add the content as a text block to the system prompt array.
+            system_blocks.push({ type: 'text', text: message.content });
+        } else if (['user', 'assistant'].includes(message.role)) {
+            // Create a full Claude message object. The 'content' itself is an array of blocks.
+            message_blocks.push({
                 role: message.role,
-                content: message.content // Content is now a simple string
+                content: [{ type: 'text', text: message.content }]
             });
         }
     }
     
-    // 4. Final formatting for the API (string content to content blocks).
-    const formatted_messages = final_message_blocks.map(msg => ({
-        role: msg.role,
-        content: [{ type: 'text', text: msg.content }]
-    }));
-
+    // Sanitize for Claude's strict user/assistant alternation rule.
+    const sanitized_message_blocks = [];
+    for (const message of message_blocks) {
+        const lastMessage = sanitized_message_blocks[sanitized_message_blocks.length - 1];
+        if (lastMessage && lastMessage.role === message.role) {
+            // If the role is the same as the last one, merge the content blocks.
+            lastMessage.content.push(...message.content);
+        } else {
+            sanitized_message_blocks.push(message);
+        }
+    }
 
     return {
-        system: system_prompt_parts.length > 0 ? system_prompt_parts.join('\n\n') : undefined,
-        messages: formatted_messages,
+        system: system_blocks.length > 0 ? system_blocks : undefined,
+        messages: sanitized_message_blocks,
     };
 }
 
@@ -135,15 +104,19 @@ function claudeStreamChunkToOpenAI(claudeChunk, providerConfig) {
 
 exports.proxyRequest = async (req, res, provider) => {
     const reqId = crypto.randomBytes(4).toString('hex');
-    const tokenUser = req.userTokenInfo ? ` (Token: ${req.userTokenInfo.name})` : '';
-    console.log(`\n--- [${reqId}] New Request for Provider: ${provider}${tokenUser} ---`);
+    const tokenName = req.userTokenInfo ? req.userTokenInfo.name : 'N/A';
+    console.log(`\n--- [${reqId}] New Request for Provider: ${provider} (Token: ${tokenName}) ---`);
 
     statsService.incrementPromptCount();
     const rotatingKey = keyManager.getRotatingKey(provider);
 
     if (!rotatingKey) {
+        const errorPayload = { error: `No active API keys available for provider '${provider}'.` };
         console.error(`[${reqId}] No active keys available for ${provider}.`);
-        return res.status(503).json({ error: `No active API keys available for provider '${provider}'.` });
+        // Log the failed attempt
+        await logService.createLogEntry(reqId, provider, tokenName, req.body);
+        await logService.updateLogEntry(reqId, 503, errorPayload);
+        return res.status(503).json(errorPayload);
     }
 
     const apiKey = rotatingKey.value;
@@ -153,6 +126,9 @@ exports.proxyRequest = async (req, res, provider) => {
     try {
         const finalMessages = await promptService.buildFinalMessages(provider, originalBody.messages, reqId);
         const finalBody = { ...originalBody, messages: finalMessages };
+
+        // Create the initial log entry
+        await logService.createLogEntry(reqId, provider, tokenName, finalBody);
 
         if (providerConfig.providerType === 'claude') {
             await handleClaudeRequest(reqId, res, finalBody, apiKey, providerConfig);
@@ -204,14 +180,16 @@ async function handleOpenAICompatibleRequest(reqId, res, body, apiKey, provider,
         }
     }
     
-    logService.logRequest(reqId, forwardBody);
-
     const providerResponse = await axios.post(forwardUrl, forwardBody, { headers, responseType: body.stream ? 'stream' : 'json' });
     keyManager.recordSuccess(provider, apiKey);
 
     if (body.stream) {
         res.setHeader('Content-Type', 'text/event-stream');
         providerResponse.data.pipe(res);
+        // For streams, we log success but cannot capture the full response payload easily.
+        providerResponse.data.on('end', () => {
+            logService.updateLogEntry(reqId, 200, { stream: true, status: 'completed' });
+        });
     } else {
         let responseData = providerResponse.data;
         if (provider === 'gemini') {
@@ -220,6 +198,10 @@ async function handleOpenAICompatibleRequest(reqId, res, body, apiKey, provider,
         }
         let usage = responseData.usage || { prompt_tokens: 0, completion_tokens: 0 };
         statsService.addTokens(usage.prompt_tokens, usage.completion_tokens);
+        
+        // Log the successful response
+        await logService.updateLogEntry(reqId, providerResponse.status, responseData);
+
         res.status(providerResponse.status).json(responseData);
     }
     console.log(`--- [${reqId}] OpenAI-Compatible Request Completed Successfully ---`);
@@ -258,10 +240,8 @@ async function handleClaudeRequest(reqId, res, body, apiKey, providerConfig) {
         'anthropic-version': '2023-06-01'
     };
     
-    console.log(`[${reqId}] Forwarding to Claude API. System prompt length: ${forwardBody.system?.length || 0}. Message count: ${forwardBody.messages.length}.`);
+    console.log(`[${reqId}] Forwarding to Claude API. System block count: ${forwardBody.system?.length || 0}. Message count: ${forwardBody.messages.length}.`);
     
-    logService.logRequest(reqId, forwardBody);
-
     const providerResponse = await axios.post(forwardUrl, forwardBody, { headers, responseType: body.stream ? 'stream' : 'json' });
     keyManager.recordSuccess(providerConfig.name, apiKey);
 
@@ -287,10 +267,16 @@ async function handleClaudeRequest(reqId, res, body, apiKey, providerConfig) {
         providerResponse.data.on('end', () => {
             res.write('data: [DONE]\n\n');
             res.end();
+            // Log stream completion
+            logService.updateLogEntry(reqId, 200, { stream: true, status: 'completed' });
         });
     } else {
         const responseData = claudeToOpenAIResponse(providerResponse.data, providerConfig);
         statsService.addTokens(responseData.usage.prompt_tokens, responseData.usage.completion_tokens);
+        
+        // Log the successful response
+        await logService.updateLogEntry(reqId, 200, responseData);
+
         res.status(200).json(responseData);
     }
     console.log(`--- [${reqId}] Claude Request Completed Successfully ---`);
@@ -326,6 +312,10 @@ async function handleProxyError(reqId, res, error, provider, apiKey) {
         } else if (!errorData) {
             errorData = { error: 'An internal proxy error occurred with no response from the provider.' };
         }
+        
+        // Log the error response
+        await logService.updateLogEntry(reqId, status || 500, errorData);
+
         res.status(status || 500).json(errorData);
     }
     console.log(`--- [${reqId}] Request Failed ---`);

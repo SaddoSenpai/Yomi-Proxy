@@ -2,6 +2,7 @@
 // Controller for rendering the public-facing main page.
 
 const keyManager = require('../services/keyManager');
+const logService = require('../services/logService');
 
 /**
  * Renders the main page, passing in statistics about available providers.
@@ -16,5 +17,16 @@ exports.renderMainPage = (req, res) => {
     // Get the security mode
     const securityMode = process.env.SECURITY || 'none';
 
-    res.render('index', { providers, baseUrl, securityMode });
+    // Get logging status
+    const logState = logService.getLogState();
+    const loggingMode = logState.mode;
+    const loggingPurgeHours = logState.purgeHours;
+
+    res.render('index', { 
+        providers, 
+        baseUrl, 
+        securityMode,
+        loggingMode,
+        loggingPurgeHours
+    });
 };

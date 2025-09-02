@@ -6,6 +6,7 @@ const promptService = require('../services/promptService');
 const keyManager = require('../services/keyManager');
 const tokenManager = require('../services/tokenManager');
 const customProviderManager = require('../services/customProviderManager');
+const logService = require('../services/logService');
 const pool = require('../config/db');
 
 const ADMIN_PASS = process.env.ADMIN_PASS || 'yomi123';
@@ -105,6 +106,65 @@ exports.deleteToken = async (req, res) => {
         res.status(204).send();
     } catch (error) {
         res.status(500).json({ error: 'Failed to delete token.' });
+    }
+};
+
+// --- API: Logs (NEW) ---
+exports.getLogs = async (req, res) => {
+    try {
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 20;
+        const data = await logService.getLogs(page, limit);
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch logs.' });
+    }
+};
+
+exports.getLogDetails = async (req, res) => {
+    try {
+        const log = await logService.getLogDetails(req.params.id);
+        if (!log) return res.status(404).json({ error: 'Log not found.' });
+        res.json(log);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch log details.' });
+    }
+};
+
+exports.deleteLog = async (req, res) => {
+    try {
+        await logService.deleteLog(req.params.id);
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete log.' });
+    }
+};
+
+exports.deleteAllLogs = async (req, res) => {
+    try {
+        await logService.deleteAllLogs();
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to delete all logs.' });
+    }
+};
+
+exports.getLogSettings = async (req, res) => {
+    try {
+        const settings = await logService.getLogSettings();
+        res.json(settings);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch log settings.' });
+    }
+};
+
+exports.updateLogSettings = async (req, res) => {
+    try {
+        const { mode, purgeHours } = req.body;
+        await logService.updateLogSettings(mode, purgeHours);
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update log settings.' });
     }
 };
 

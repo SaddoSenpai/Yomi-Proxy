@@ -12,17 +12,30 @@
         <h1>Yomi Proxy</h1>
         <p>This is a public proxy for various AI models. Use the endpoints below with your preferred client.</p>
         
-        <div class="security-info">
-            <strong>Security Mode:</strong> 
-            <% if (securityMode === 'none') { %>
-                <span class="status-none">None (Open to Public)</span>
-            <% } else if (securityMode === 'password') { %>
-                <span class="status-password">Password Protected</span>
-            <% } else if (securityMode === 'token') { %>
-                <span class="status-token">User Token Required</span>
-            <% } else { %>
-                <span class="status-unknown">Unknown</span>
-            <% } %>
+        <div class="info-grid">
+            <div class="security-info">
+                <strong>Security Mode:</strong> 
+                <% if (securityMode === 'none') { %>
+                    <span class="status-none">None (Open to Public)</span>
+                <% } else if (securityMode === 'password') { %>
+                    <span class="status-password">Password Protected</span>
+                <% } else if (securityMode === 'token') { %>
+                    <span class="status-token">User Token Required</span>
+                <% } else { %>
+                    <span class="status-unknown">Unknown</span>
+                <% } %>
+            </div>
+
+            <div class="security-info">
+                <strong>Logging Status:</strong> 
+                <% if (loggingMode === 'enabled') { %>
+                    <span class="status-logging-enabled">Enabled</span>
+                <% } else if (loggingMode === 'auto_purge') { %>
+                    <span class="status-logging-purge">Auto Purge (in <%= loggingPurgeHours %>h)</span>
+                <% } else { %>
+                    <span class="status-logging-disabled">Disabled</span>
+                <% } %>
+            </div>
         </div>
 
         <% if (providers.length > 0) { %>
@@ -49,7 +62,6 @@
                                 <div><strong>Required Model:</strong> <span><%= provider.enforcedModelName %></span></div>
                             <% } %>
                         <% } %>
-                        <!-- --- MODIFIED: Simplified display for all providers --- -->
                         <div><strong>Max Context:</strong> <span><%= provider.maxContext %></span></div>
                         <div><strong>Max Output:</strong> <span><%= provider.maxOutput %></span></div>
                     </div>

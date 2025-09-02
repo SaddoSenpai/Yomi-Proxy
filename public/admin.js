@@ -49,6 +49,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return response.status === 204 ? null : response.json();
     }
 
+    // --- Helper function for showing alerts/toasts ---
+    function showAlert(message, isError = false) {
+        // You can replace this with a more sophisticated toast notification library
+        alert(message);
+        if (isError) console.error(message);
+    }
+
     // --- Helper function for copying text ---
     window.copyToClipboard = (text, button) => {
         navigator.clipboard.writeText(text).then(() => {
@@ -116,7 +123,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span class="block-role">(${block.role}) ${isInjection ? '[Injection Point]' : ''}</span>
                     </div>
                     <div class="block-actions">
-                        <!-- --- REORDERING: NEW move controls --- -->
                         <div class="move-controls">
                             <button class="btn-secondary btn-move" onclick="moveBlock(${index}, -1)" ${index === 0 ? 'disabled' : ''}>
                                 <i class='bx bx-up-arrow-alt'></i>
@@ -157,25 +163,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     
-    // --- REORDERING: NEW function to move blocks ---
     window.moveBlock = (index, direction) => {
         const newIndex = index + direction;
-
-        // Boundary check
-        if (newIndex < 0 || newIndex >= currentBlocks.length) {
-            return;
-        }
-
-        // Swap elements using array destructuring
+        if (newIndex < 0 || newIndex >= currentBlocks.length) return;
         [currentBlocks[index], currentBlocks[newIndex]] = [currentBlocks[newIndex], currentBlocks[index]];
-        
-        // If we were editing the block that moved, update the index
-        if(currentlyEditingIndex === index) {
-            currentlyEditingIndex = newIndex;
-        } else if (currentlyEditingIndex === newIndex) {
-            currentlyEditingIndex = index;
-        }
-
+        if(currentlyEditingIndex === index) currentlyEditingIndex = newIndex;
+        else if (currentlyEditingIndex === newIndex) currentlyEditingIndex = index;
         renderBlocks();
         updateSaveButtonState();
     };
@@ -526,6 +519,151 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     fetchCustomProviders();
+
+    // --- Logs Manager ---
+    const logsTable = document.getElementById('logsTable');
+    const logsPagination = document.getElementById('logsPagination');
+    const logSettingsForm = document.getElementById('log-settings-form');
+    const purgeHoursWrapper = document.getElementById('purge-hours-wrapper');
+    let currentPage = 1;
+
+    async function fetchLogs(page = 1) {
+        try {
+            currentPage = page;
+            const data = await api(`/logs?page=${page}&limit=20`);
+            renderLogs(data.logs);
+            renderPagination(data.total, page, 20);
+        } catch (error) {
+            showAlert('Error fetching logs: ' + error.message, true);
+        }
+    }
+
+    function renderLogs(logs) {
+        if (logs.length === 0) {
+            logsTable.innerHTML = '<p class="muted">No logs found.</p>';
+            return;
+        }
+        logsTable.innerHTML = `
+            <div class="log-row header">
+                <div>Status</div>
+                <div>Provider</div>
+                <div>Token Name</div>
+                <div>Timestamp</div>
+                <div>Actions</div>
+            </div>
+            ${logs.map(log => `
+                <div class="log-row">
+                    <div><span class="status-code s-${String(log.status_code).charAt(0)}">${log.status_code}</span></div>
+                    <div>${log.provider}</div>
+                    <div>${log.token_name}</div>
+                    <div>${new Date(log.created_at).toLocaleString()}</div>
+                    <div class="log-actions">
+                        <button class="btn-secondary" onclick="viewLogDetails(${log.id})">Details</button>
+                        <button class="btn-secondary" onclick="deleteLog(${log.id})">Delete</button>
+                    </div>
+                </div>
+            `).join('')}
+        `;
+    }
+
+    function renderPagination(total, page, limit) {
+        const totalPages = Math.ceil(total / limit);
+        logsPagination.innerHTML = '';
+        if (totalPages <= 1) return;
+
+        for (let i = 1; i <= totalPages; i++) {
+            const pageBtn = document.createElement('button');
+            pageBtn.textContent = i;
+            pageBtn.className = (i === page) ? 'active' : '';
+            pageBtn.onclick = () => fetchLogs(i);
+            logsPagination.appendChild(pageBtn);
+        }
+    }
+    
+    window.deleteLog = async (id) => {
+        if (!confirm('Are you sure you want to delete this log?')) return;
+        try {
+            await api(`/logs/${id}`, { method: 'DELETE' });
+            fetchLogs(currentPage); // Refresh the current page
+        } catch (error) {
+            showAlert('Error deleting log: ' + error.message, true);
+        }
+    };
+
+    document.getElementById('deleteAllLogsBtn').onclick = async () => {
+        if (!confirm('Are you sure you want to delete ALL logs? This action is irreversible.')) return;
+        try {
+            await api('/logs', { method: 'DELETE' });
+            fetchLogs(1); // Refresh to page 1
+        } catch (error) {
+            showAlert('Error deleting all logs: ' + error.message, true);
+        }
+    };
+
+    // Log Settings
+    async function fetchLogSettings() {
+        try {
+            const settings = await api('/logging-settings');
+            document.querySelector(`input[name="log_mode"][value="${settings.logging_mode}"]`).checked = true;
+            document.getElementById('log_purge_hours').value = settings.logging_purge_hours;
+            togglePurgeHoursVisibility();
+        } catch (error) {
+            showAlert('Error fetching log settings: ' + error.message, true);
+        }
+    }
+
+    function togglePurgeHoursVisibility() {
+        const selectedMode = document.querySelector('input[name="log_mode"]:checked').value;
+        purgeHoursWrapper.style.display = selectedMode === 'auto_purge' ? 'block' : 'none';
+    }
+
+    document.querySelectorAll('input[name="log_mode"]').forEach(radio => {
+        radio.addEventListener('change', togglePurgeHoursVisibility);
+    });
+
+    logSettingsForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const mode = document.querySelector('input[name="log_mode"]:checked').value;
+        const purgeHours = document.getElementById('log_purge_hours').value;
+        try {
+            await api('/logging-settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode, purgeHours: parseInt(purgeHours, 10) })
+            });
+            showAlert('Log settings saved successfully!');
+        } catch (error) {
+            showAlert('Error saving settings: ' + error.message, true);
+        }
+    };
+
+    // Log Details Modal
+    const modal = document.getElementById('logDetailModal');
+    const closeBtn = document.querySelector('.modal .close-button');
+    closeBtn.onclick = () => modal.style.display = 'none';
+    window.onclick = (event) => {
+        if (event.target == modal) {
+            modal.style.display = 'none';
+        }
+    };
+
+    window.viewLogDetails = async (id) => {
+        try {
+            const log = await api(`/logs/${id}`);
+            document.getElementById('logRequestPayload').textContent = JSON.stringify(log.request_payload, null, 2);
+            document.getElementById('logResponsePayload').textContent = JSON.stringify(log.response_payload, null, 2);
+            modal.style.display = 'block';
+        } catch (error) {
+            showAlert('Error fetching log details: ' + error.message, true);
+        }
+    };
+
+    // Initial fetch when tab is shown
+    const logsTabLink = document.querySelector('a[data-tab="logs"]');
+    logsTabLink.addEventListener('click', () => {
+        fetchLogs(1);
+        fetchLogSettings();
+    });
 
     // --- Import/Export ---
     document.getElementById('exportBtn').onclick = () => {

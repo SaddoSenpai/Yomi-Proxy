@@ -9,7 +9,8 @@
     --green: #28a745;
     --orange: #ffae57;
     --red: #dc3545;
-    --blue: #3e64ff; /* Added for consistency */
+    --blue: #3e64ff;
+    --purple: #9b59b6;
 }
 
 body {
@@ -114,12 +115,25 @@ h1, h2 {
 .key-status.over-quota { background-color: var(--orange); color: var(--bg-dark); }
 .key-status.revoked { background-color: var(--red); color: white; }
 
-/* NEW: Security Info Styles */
+/* Info Grid for Security & Logging */
+.info-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+@media (min-width: 600px) {
+    .info-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+/* Security & Logging Info Styles */
 .security-info {
     background-color: var(--bg-card);
     padding: 1rem;
     border-radius: 8px;
-    margin-bottom: 2rem;
     border: 1px solid var(--border-color);
 }
 .security-info span {
@@ -132,6 +146,11 @@ h1, h2 {
 .security-info .status-password { background-color: var(--orange); color: var(--bg-dark); }
 .security-info .status-token { background-color: var(--blue); }
 .security-info .status-unknown { background-color: var(--red); }
+
+/* Logging Status Colors */
+.security-info .status-logging-enabled { background-color: var(--orange); color: var(--bg-dark); }
+.security-info .status-logging-purge { background-color: var(--purple); }
+.security-info .status-logging-disabled { background-color: var(--green); }
 
 
 /* Login Page Styles (for /admin) */

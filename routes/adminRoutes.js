@@ -29,10 +29,18 @@ router.get('/api/tokens', adminAuth, adminController.getTokens);
 router.post('/api/tokens', adminAuth, adminController.saveToken);
 router.delete('/api/tokens/:id', adminAuth, adminController.deleteToken);
 
-// Custom Providers (NEW)
+// Custom Providers
 router.get('/api/custom-providers', adminAuth, adminController.getCustomProviders);
 router.post('/api/custom-providers', adminAuth, adminController.saveCustomProvider);
 router.delete('/api/custom-providers/:id', adminAuth, adminController.deleteCustomProvider);
+
+// Logs (NEW)
+router.get('/api/logs', adminAuth, adminController.getLogs);
+router.get('/api/logs/:id', adminAuth, adminController.getLogDetails);
+router.delete('/api/logs/:id', adminAuth, adminController.deleteLog);
+router.delete('/api/logs', adminAuth, adminController.deleteAllLogs);
+router.get('/api/logging-settings', adminAuth, adminController.getLogSettings);
+router.put('/api/logging-settings', adminAuth, adminController.updateLogSettings);
 
 // Import/Export
 router.post('/api/import', adminAuth, adminController.importData);
