@@ -603,7 +603,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Log Settings (REWRITTEN FOR RELIABILITY) ---
     function togglePurgeHoursVisibility() {
-        const selectedMode = document.querySelector('input[name="log_mode"]:checked').value;
+        const selectedRadio = document.querySelector('input[name="log_mode"]:checked');
+        const selectedMode = selectedRadio ? selectedRadio.value : null;
         purgeHoursWrapper.style.display = selectedMode === 'auto_purge' ? 'block' : 'none';
     }
 

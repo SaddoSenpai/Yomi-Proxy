@@ -32,7 +32,7 @@
                     <span class="status-logging-enabled">Enabled</span>
                 <% } else if (loggingMode === 'auto_purge') { %>
                     <span class="status-logging-purge">Auto Purge (in <%= loggingPurgeHours %>h)</span>
-                <% } else { %>
+                <% } else if (loggingMode === 'disabled') { %>
                     <span class="status-logging-disabled">Disabled</span>
                 <% } %>
             </div>
