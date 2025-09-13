@@ -14,6 +14,7 @@ router.get('/logout', adminController.handleLogout);
 
 // --- Admin API Endpoints (protected by adminAuth middleware) ---
 router.get('/api/stats', adminAuth, adminController.getStats);
+router.get('/api/server-time', adminAuth, adminController.getServerTime); // <-- NEW ROUTE
 
 // Structure
 router.get('/api/structure', adminAuth, adminController.getStructure);
@@ -34,7 +35,7 @@ router.get('/api/custom-providers', adminAuth, adminController.getCustomProvider
 router.post('/api/custom-providers', adminAuth, adminController.saveCustomProvider);
 router.delete('/api/custom-providers/:id', adminAuth, adminController.deleteCustomProvider);
 
-// Logs (NEW)
+// Logs
 router.get('/api/logs', adminAuth, adminController.getLogs);
 router.get('/api/logs/:id', adminAuth, adminController.getLogDetails);
 router.delete('/api/logs/:id', adminAuth, adminController.deleteLog);

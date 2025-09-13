@@ -1,0 +1,38 @@
+<!-- views/commands.ejs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Available Commands - Yomi Proxy</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body class="public">
+    <main class="container">
+        <h1>Available Commands</h1>
+        <p>
+            Include any of these tags in your messages to activate them. 
+            The tag will be removed and replaced with its content by the proxy.
+        </p>
+        <a href="/" class="back-link">&larr; Back to Main Page</a>
+
+        <% if (commands.length > 0) { %>
+            <% commands.forEach(command => { %>
+                <div class="command-card">
+                    <!-- Corrected line to display the tag properly -->
+                    <h3><code>&lt;<%= command.command_tag %>&gt;</code></h3>
+                    <div class="command-details">
+                        <div><strong>Name:</strong> <span><%= command.block_name %></span></div>
+                        <div><strong>Type:</strong> <span><%= command.command_type %></span></div>
+                    </div>
+                    <!-- The command content display has been removed as requested -->
+                </div>
+            <% }) %>
+        <% } else { %>
+            <p>No user-activatable commands are currently configured by the administrator.</p>
+        <% } %>
+        
+        <a href="/" class="back-link" style="margin-top: 2rem;">&larr; Back to Main Page</a>
+    </main>
+</body>
+        </html>

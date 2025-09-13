@@ -3,6 +3,7 @@
 
 const keyManager = require('../services/keyManager');
 const logService = require('../services/logService');
+const promptService = require('../services/promptService'); // <-- IMPORT PROMPT SERVICE
 
 /**
  * Renders the main page, passing in statistics about available providers.
@@ -29,4 +30,19 @@ exports.renderMainPage = (req, res) => {
         loggingMode,
         loggingPurgeHours
     });
+};
+
+/**
+ * Renders the public commands page.
+ */
+exports.renderCommandsPage = async (req, res) => {
+    try {
+        const commands = await promptService.getCommands();
+        // We only want to show commands that are not Prefills, as those are automated.
+        const visibleCommands = commands.filter(cmd => cmd.command_type !== 'Prefill');
+        res.render('commands', { commands: visibleCommands });
+    } catch (error) {
+        console.error('Failed to render commands page:', error);
+        res.status(500).send('Error loading commands.');
+    }
 };

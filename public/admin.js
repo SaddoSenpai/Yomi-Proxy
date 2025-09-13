@@ -49,14 +49,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return response.status === 204 ? null : response.json();
     }
 
-    // --- Helper function for showing alerts/toasts ---
     function showAlert(message, isError = false) {
-        // You can replace this with a more sophisticated toast notification library
         alert(message);
         if (isError) console.error(message);
     }
 
-    // --- Helper function for copying text ---
     window.copyToClipboard = (text, button) => {
         navigator.clipboard.writeText(text).then(() => {
             const originalText = button.textContent;
@@ -79,7 +76,36 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('stat-output-tokens').textContent = stats.totalOutputTokens.toLocaleString();
         } catch (error) { console.error('Failed to fetch stats:', error); }
     }
+    
+    // --- NEW: Server Clock ---
+    let serverClockInterval;
+    async function startServerClock() {
+        try {
+            const data = await api('/server-time');
+            let serverNow = new Date(data.serverTime);
+            
+            const timeElement = document.getElementById('stat-server-time');
+
+            if (serverClockInterval) clearInterval(serverClockInterval);
+
+            serverClockInterval = setInterval(() => {
+                serverNow.setSeconds(serverNow.getSeconds() + 1);
+                
+                const datePart = serverNow.toLocaleDateString('en-CA', { timeZone: 'UTC' }); // YYYY-MM-DD
+                const timePart = serverNow.toLocaleTimeString('en-US', { timeZone: 'UTC', hour12: false }); // HH:MM:SS
+
+                timeElement.innerHTML = `${datePart}<br>${timePart}`;
+            }, 1000);
+
+        } catch (error) {
+            console.error('Failed to start server clock:', error);
+            document.getElementById('stat-server-time').textContent = 'Error';
+        }
+    }
+    
+    // Initial calls
     fetchStats();
+    startServerClock();
     setInterval(fetchStats, 5000);
 
     // --- Structure Editor ---
@@ -313,6 +339,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const tokenValueDisplay = document.getElementById('token_value_display');
     let allTokens = [];
 
+    function formatUTCDateForInput(dateString) {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        const pad = (num) => num.toString().padStart(2, '0');
+        const year = date.getFullYear();
+        const month = pad(date.getMonth() + 1);
+        const day = pad(date.getDate());
+        const hours = pad(date.getHours());
+        const minutes = pad(date.getMinutes());
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+
     async function fetchTokens() {
         try {
             const data = await api('/tokens');
@@ -324,26 +362,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderTokens() {
-        tokensList.innerHTML = allTokens.map(token => `
-            <div>
-                <div class="command-item">
-                    <div class="cmd-info">
-                        <strong>${token.name}</strong> - ${token.rpm} RPM
-                        <span style="color: ${token.is_enabled ? 'var(--green)' : 'var(--red)'};">
-                            (${token.is_enabled ? 'Enabled' : 'Disabled'})
-                        </span>
+        tokensList.innerHTML = allTokens.map(token => {
+            const isExpired = token.expires_at && new Date(token.expires_at) < new Date();
+            const expirationText = token.expires_at 
+                ? `Expires: ${new Date(token.expires_at).toLocaleString()}` 
+                : 'No Expiration';
+            return `
+                <div>
+                    <div class="command-item">
+                        <div class="cmd-info">
+                            <strong>${token.name}</strong> - ${token.rpm} RPM
+                            <span style="color: ${token.is_enabled ? 'var(--green)' : 'var(--red)'};">
+                                (${token.is_enabled ? 'Enabled' : 'Disabled'})
+                            </span>
+                            <br>
+                            <span style="font-size: 0.8em; color: ${isExpired ? 'var(--red)' : 'var(--text-muted)'};">
+                                ${expirationText}
+                            </span>
+                        </div>
+                        <div class="cmd-actions">
+                            <button class="btn-secondary" onclick="editToken(${token.id})">Edit</button>
+                            <button class="btn-secondary" onclick="deleteToken(${token.id})">Delete</button>
+                        </div>
                     </div>
-                    <div class="cmd-actions">
-                        <button class="btn-secondary" onclick="editToken(${token.id})">Edit</button>
-                        <button class="btn-secondary" onclick="deleteToken(${token.id})">Delete</button>
+                    <div class="token-value-wrapper">
+                        <code>${token.token}</code>
+                        <button class="btn-secondary" onclick="copyToClipboard('${token.token}', this)">Copy</button>
                     </div>
                 </div>
-                <div class="token-value-wrapper">
-                    <code>${token.token}</code>
-                    <button class="btn-secondary" onclick="copyToClipboard('${token.token}', this)">Copy</button>
-                </div>
-            </div>
-        `).join('');
+            `
+        }).join('');
     }
 
     window.editToken = (id) => {
@@ -355,6 +403,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('token_rpm').value = token.rpm;
         document.getElementById('token_enabled').value = token.is_enabled;
         
+        document.getElementById('token_expires_at').value = formatUTCDateForInput(token.expires_at);
+
         tokenValueDisplay.value = token.token;
         existingTokenWrapper.style.display = 'block';
 
@@ -384,17 +434,22 @@ document.addEventListener('DOMContentLoaded', () => {
         regenerateWrapper.style.display = 'none';
         existingTokenWrapper.style.display = 'none';
         document.getElementById('token_regenerate').checked = false;
+        document.getElementById('token_expires_at').value = '';
     };
 
     tokenForm.onsubmit = async (e) => {
         e.preventDefault();
         const id = document.getElementById('token_id').value || null;
+        const expiresAtValue = document.getElementById('token_expires_at').value;
+        const expiresAtISO = expiresAtValue ? new Date(expiresAtValue).toISOString() : null;
+
         const body = {
             id: id,
             name: document.getElementById('token_name').value,
             rpm: parseInt(document.getElementById('token_rpm').value, 10),
             is_enabled: document.getElementById('token_enabled').value === 'true',
-            regenerate: id ? document.getElementById('token_regenerate').checked : false
+            regenerate: id ? document.getElementById('token_regenerate').checked : false,
+            expires_at: expiresAtISO
         };
 
         try {
@@ -547,6 +602,8 @@ document.addEventListener('DOMContentLoaded', () => {
         logsTable.innerHTML = `
             <div class="log-row header">
                 <div>Status</div>
+                <div>Character</div>
+                <div>Commands</div>
                 <div class="mobile-hidden">Provider</div>
                 <div class="mobile-hidden">Token Name</div>
                 <div>Timestamp</div>
@@ -555,6 +612,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ${logs.map(log => `
                 <div class="log-row">
                     <div><span class="status-code s-${String(log.status_code).charAt(0)}">${log.status_code}</span></div>
+                    <div>${log.character_name || 'N/A'}</div>
+                    <div class="mobile-hidden">${log.detected_commands || 'None'}</div>
                     <div class="mobile-hidden">${log.provider}</div>
                     <div class="mobile-hidden">${log.token_name}</div>
                     <div>${new Date(log.created_at).toLocaleString()}</div>
@@ -585,7 +644,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!confirm('Are you sure you want to delete this log?')) return;
         try {
             await api(`/logs/${id}`, { method: 'DELETE' });
-            fetchLogs(currentPage); // Refresh the current page
+            fetchLogs(currentPage);
         } catch (error) {
             showAlert('Error deleting log: ' + error.message, true);
         }
@@ -595,13 +654,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!confirm('Are you sure you want to delete ALL logs? This action is irreversible.')) return;
         try {
             await api('/logs', { method: 'DELETE' });
-            fetchLogs(1); // Refresh to page 1
+            fetchLogs(1);
         } catch (error) {
             showAlert('Error deleting all logs: ' + error.message, true);
         }
     };
 
-    // --- Log Settings (REWRITTEN FOR RELIABILITY) ---
     function togglePurgeHoursVisibility() {
         const selectedRadio = document.querySelector('input[name="log_mode"]:checked');
         const selectedMode = selectedRadio ? selectedRadio.value : null;
@@ -613,37 +671,30 @@ document.addEventListener('DOMContentLoaded', () => {
             const settings = await api('/logging-settings');
             const mode = settings.logging_mode || 'disabled';
             
-            // Check the correct hidden radio button
             const radioToSelect = document.getElementById(`log-${mode}`);
             if (radioToSelect) radioToSelect.checked = true;
             
-            // Update the visual style of the options
             logSettingOptions.forEach(opt => {
                 opt.classList.toggle('active', opt.dataset.value === mode);
             });
 
             document.getElementById('log_purge_hours').value = settings.logging_purge_hours || 24;
             
-            // Finally, update the visibility of the purge hours input
             togglePurgeHoursVisibility();
         } catch (error) {
             showAlert('Error fetching log settings: ' + error.message, true);
         }
     }
 
-    // Add click listeners to the styled options
     logSettingOptions.forEach(option => {
         option.addEventListener('click', () => {
             const value = option.dataset.value;
-            // Check the underlying radio button
             const radio = document.getElementById(`log-${value}`);
             if (radio) radio.checked = true;
             
-            // Update visual styles
             logSettingOptions.forEach(opt => opt.classList.remove('active'));
             option.classList.add('active');
 
-            // Directly call the visibility function
             togglePurgeHoursVisibility();
         });
     });
@@ -664,7 +715,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Log Details Modal
     const modal = document.getElementById('logDetailModal');
     const closeBtn = document.querySelector('.modal .close-button');
     closeBtn.onclick = () => modal.style.display = 'none';
@@ -685,14 +735,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // Initial fetch when tab is shown
     const logsTabLink = document.querySelector('a[data-tab="logs"]');
     logsTabLink.addEventListener('click', () => {
         fetchLogs(1);
         fetchLogSettings();
     });
 
-    // --- Import/Export ---
     document.getElementById('exportBtn').onclick = () => {
         const provider = document.getElementById('exportProviderSelector').value;
         window.location.href = `/admin/api/export?provider=${provider}`;
@@ -714,9 +762,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!result.ok) throw new Error(data.detail || data.error);
             
             alert(data.message);
-            fileInput.value = ''; // Clear the file input
-            fetchStructure(providerSelector.value); // Refresh structure view
-            fetchCommands(); // Refresh commands
+            fileInput.value = '';
+            fetchStructure(providerSelector.value);
+            fetchCommands();
         } catch (error) {
             alert('Import failed: ' + error.message);
         }

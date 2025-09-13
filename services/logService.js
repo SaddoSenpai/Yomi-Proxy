@@ -38,15 +38,17 @@ async function initialize() {
  * @param {string} provider - The provider being requested.
  * @param {string} tokenName - The name of the user token, if any.
  * @param {object} requestPayload - The JSON body of the request.
+ * @param {string} characterName - The detected character name.
+ * @param {string} detectedCommands - Comma-separated list of commands.
  */
-async function createLogEntry(reqId, provider, tokenName, requestPayload) {
+async function createLogEntry(reqId, provider, tokenName, requestPayload, characterName, detectedCommands) {
     if (state.mode === 'disabled') return;
 
     try {
         await pool.query(
-            `INSERT INTO request_logs (request_id, provider, token_name, request_payload, status_code) 
-             VALUES ($1, $2, $3, $4, $5)`,
-            [reqId, provider, tokenName, requestPayload, 0] // 0 for pending
+            `INSERT INTO request_logs (request_id, provider, token_name, request_payload, status_code, character_name, detected_commands) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [reqId, provider, tokenName, requestPayload, 0, characterName, detectedCommands] // 0 for pending
         );
     } catch (error) {
         console.error(`[Log Service] Failed to create log entry for request ${reqId}.`, error);
@@ -81,7 +83,7 @@ async function updateLogEntry(reqId, statusCode, responsePayload) {
 async function getLogs(page = 1, limit = 20) {
     const offset = (page - 1) * limit;
     const logsResult = await pool.query(
-        'SELECT id, request_id, provider, token_name, status_code, created_at FROM request_logs ORDER BY created_at DESC LIMIT $1 OFFSET $2',
+        'SELECT id, request_id, provider, token_name, status_code, created_at, character_name, detected_commands FROM request_logs ORDER BY created_at DESC LIMIT $1 OFFSET $2',
         [limit, offset]
     );
     const totalResult = await pool.query('SELECT COUNT(*) FROM request_logs');

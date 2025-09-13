@@ -35,6 +35,12 @@ exports.handleLogout = (req, res) => {
 // --- API: Stats ---
 exports.getStats = (req, res) => res.json(statsService.getStats());
 
+// --- NEW API: Server Time ---
+exports.getServerTime = (req, res) => {
+    // Respond with the current server time in a standard ISO format (UTC)
+    res.json({ serverTime: new Date().toISOString() });
+};
+
 // --- API: Structure ---
 exports.getStructure = async (req, res) => {
     try {
@@ -109,7 +115,7 @@ exports.deleteToken = async (req, res) => {
     }
 };
 
-// --- API: Logs (NEW) ---
+// --- API: Logs ---
 exports.getLogs = async (req, res) => {
     try {
         const page = parseInt(req.query.page, 10) || 1;
@@ -180,7 +186,6 @@ exports.getCustomProviders = async (req, res) => {
 
 exports.saveCustomProvider = async (req, res) => {
     try {
-        // --- CLAUDE INTEGRATION: Destructure the new provider_type field ---
         const {
             id,
             provider_type,

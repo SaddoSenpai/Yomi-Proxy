@@ -114,7 +114,7 @@ exports.proxyRequest = async (req, res, provider) => {
         const errorPayload = { error: `No active API keys available for provider '${provider}'.` };
         console.error(`[${reqId}] No active keys available for ${provider}.`);
         // Log the failed attempt
-        await logService.createLogEntry(reqId, provider, tokenName, req.body);
+        await logService.createLogEntry(reqId, provider, tokenName, req.body, 'N/A', 'N/A');
         await logService.updateLogEntry(reqId, 503, errorPayload);
         return res.status(503).json(errorPayload);
     }
@@ -124,11 +124,12 @@ exports.proxyRequest = async (req, res, provider) => {
     const providerConfig = keyManager.getProviderConfig(provider);
 
     try {
-        const finalMessages = await promptService.buildFinalMessages(provider, originalBody.messages, reqId);
+        const { finalMessages, characterName, commandTags } = await promptService.buildFinalMessages(provider, originalBody.messages, reqId);
         const finalBody = { ...originalBody, messages: finalMessages };
 
         // Create the initial log entry
-        await logService.createLogEntry(reqId, provider, tokenName, finalBody);
+        const detectedCommands = commandTags.length > 0 ? commandTags.join(', ') : 'None';
+        await logService.createLogEntry(reqId, provider, tokenName, finalBody, characterName, detectedCommands);
 
         if (providerConfig.providerType === 'claude') {
             await handleClaudeRequest(reqId, res, finalBody, apiKey, providerConfig);

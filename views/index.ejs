@@ -75,6 +75,44 @@
         <% } else { %>
             <p>No providers are currently configured. The administrator needs to add API keys.</p>
         <% } %>
+
+        <!-- NEW USER GUIDE SECTION -->
+        <section class="user-guide">
+            <h2>How to Use This Proxy</h2>
+
+            <h3>1. API Endpoint & Model Name</h3>
+            <p>
+                Use the full API Endpoint provided above in your client's API URL field. For the "Model Name" field in your client:
+            </p>
+            <ul>
+                <li><strong>How to use (OpenAI, Gemini, etc.):</strong> You can use any model name supported by that provider (e.g., <code>gpt-4o</code>, <code>gemini-2.5-pro</code>). If a "Required Model" is listed, you <strong>must</strong> use that exact name in your client's model field. Otherwise, you can typically use any name you like, as the proxy will replace it with the correct model ID automatically.</li>
+            <h3>2. Custom Prompts</h3>
+            <p>
+                This proxy allows you to inject a custom prompt. This is useful for things like character-specific instructions or memory.
+            </p>
+            <p>
+                To use it, place a special tag in your <strong>Custom Prompt Field</strong> like this:
+            </p>
+            <pre><code>&lt;Custom_Prompt&gt;
+This is my special instruction for the AI.
+It can be multiple lines.
+&lt;/Custom_Prompt&gt;</code></pre>
+            <p>
+                The proxy will extract this text. If the administrator has configured a <code>&lt;&lt;CUSTOM_PROMPT&gt;&gt;</code> placeholder in the prompt structure for this provider, your text will be injected there. If not, this tag will be ignored.
+            </p>
+
+            <h3>3. Commands</h3>
+            <p>
+                Commands are special tags you can include anywhere in your messages or custom prompts.
+            </p>
+            <p>
+                For example, to make the bot uses more emojis, use <code>&lt;EMOJIS&gt;</code>command. The proxy will detect this, remove the tag, and inject the corresponding content at the location defined by the administrator.
+            </p>
+            <p>
+                <a href="/commands" class="btn-link">View the full list of available commands here</a>
+            </p>
+        </section>
+
     </main>
 
     <script src="/main.js"></script>

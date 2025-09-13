@@ -27,7 +27,7 @@ body {
     text-align: center;
 }
 
-h1, h2 {
+h1, h2, h3 {
     color: var(--accent-primary);
     border-bottom: 2px solid var(--border-color);
     padding-bottom: 0.5rem;
@@ -50,7 +50,7 @@ h1, h2 {
     align-items: center;
     flex-wrap: wrap;
 }
-.provider-header h2 {
+.provider-header h2, .command-card h3 {
     border: none;
     margin: 0;
 }
@@ -90,14 +90,14 @@ h1, h2 {
     color: white;
 }
 
-.provider-details {
+.provider-details, .command-details {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
     margin: 1.5rem 0;
     color: var(--text-muted);
 }
-.provider-details span {
+.provider-details span, .command-details span {
     color: var(--text-light);
     font-weight: bold;
 }
@@ -152,6 +152,83 @@ h1, h2 {
 .security-info .status-logging-purge { background-color: var(--purple); }
 .security-info .status-logging-disabled { background-color: var(--green); }
 
+/* --- User Guide Styles --- */
+.user-guide {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem 2rem;
+    margin-top: 3rem;
+    text-align: left;
+}
+.user-guide h2 {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+.user-guide h3 {
+    border-bottom: 1px solid var(--border-color);
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+}
+.user-guide p, .user-guide ul {
+    color: var(--text-muted);
+    line-height: 1.6;
+}
+.user-guide ul {
+    padding-left: 20px;
+}
+.user-guide code {
+    background-color: var(--bg-dark);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    color: var(--orange);
+}
+.user-guide pre {
+    background-color: var(--bg-dark);
+    padding: 1rem;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.user-guide a.btn-link {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    margin-top: 1rem;
+    background-color: var(--blue);
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+.user-guide a.btn-link:hover {
+    background-color: #5a7bff;
+}
+
+/* --- Commands Page Styles --- */
+.back-link {
+    display: inline-block;
+    margin: 1.5rem 0;
+    color: var(--accent-primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+.command-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    text-align: left;
+}
+.command-card h3 code {
+    color: var(--orange);
+    background: none;
+    padding: 0;
+    font-size: 1.2em;
+}
 
 /* Login Page Styles (for /admin) */
 .login-container {

@@ -52,6 +52,11 @@
                         <h3>Total Output Tokens</h3>
                         <p id="stat-output-tokens">Loading...</p>
                     </div>
+                    <!-- NEW: Server Time Card -->
+                    <div class="stat-card">
+                        <h3>Server Time (UTC)</h3>
+                        <p id="stat-server-time" style="font-size: 1.8em; line-height: 1.4;">Loading...</p>
+                    </div>
                 </div>
             </div>
 
@@ -149,6 +154,11 @@
                                 <option value="true">Enabled</option>
                                 <option value="false">Disabled</option>
                             </select>
+
+                            <label for="token_expires_at">Expiration Date (optional)</label>
+                            <input id="token_expires_at" type="datetime-local">
+                            <p class="muted" style="margin-top: -10px; font-size: 0.8em;">The token will be automatically disabled after this date. Leave blank for no expiration.</p>
+
 
                             <div id="regenerate-wrapper" style="display: none; margin-top: 15px;">
                                 <input type="checkbox" id="token_regenerate" style="width: auto; margin-bottom: 0;">

@@ -16,6 +16,7 @@ function parseJanitorInput(incomingMessages) {
   let userInfo = '';
   let scenarioInfo = '';
   let summaryInfo = '';
+  let customPromptInfo = ''; 
   const fullContent = (incomingMessages || []).map(m => m.content || '').join('\n\n');
   
   const charRegex = /<(.+?)'s Persona>([\s\S]*?)<\/\1's Persona>/;
@@ -42,11 +43,17 @@ function parseJanitorInput(incomingMessages) {
   if (summaryMatch) {
     summaryInfo = summaryMatch[1].trim();
   }
+  
+  const customPromptRegex = /<Custom_Prompt>([\s\S]*?)<\/Custom_Prompt>/;
+  const customPromptMatch = fullContent.match(customPromptRegex);
+  if (customPromptMatch) {
+    customPromptInfo = customPromptMatch[1].trim();
+  }
 
   const chatHistory = (incomingMessages || [])
     .filter(m => {
         const content = m.content || '';
-        return !content.includes("'s Persona>") && !content.includes("<UserPersona>") && !content.includes("<scenario>") && !content.includes("<summary>");
+        return !content.includes("'s Persona>") && !content.includes("<UserPersona>") && !content.includes("<scenario>") && !content.includes("<summary>") && !content.includes("<Custom_Prompt>");
     })
     .map(m => {
         if (m.role === 'assistant' && m.content && m.content.includes('<w>')) {
@@ -56,7 +63,7 @@ function parseJanitorInput(incomingMessages) {
         return m;
     });
 
-  return { characterName, characterInfo, userInfo, scenarioInfo, summaryInfo, chatHistory };
+  return { characterName, characterInfo, userInfo, scenarioInfo, summaryInfo, customPromptInfo, chatHistory };
 }
 
 function parseCommandsFromMessages(messages) {
@@ -87,12 +94,14 @@ async function buildFinalMessages(provider, incomingMessages, reqId) {
 
     if (structureToUse.length === 0) {
         console.log(`[${reqId}] No global structure found. Passing messages through directly.`);
-        return incomingMessages;
+        const { characterName } = parseJanitorInput(incomingMessages);
+        const commandTags = parseCommandsFromMessages(incomingMessages);
+        return { finalMessages: incomingMessages, characterName, commandTags };
     }
     
     console.log(`[${reqId}] Processing request with global structure for provider: ${provider}`);
 
-    const { characterName, characterInfo, userInfo, scenarioInfo, summaryInfo, chatHistory } = parseJanitorInput(incomingMessages);
+    const { characterName, characterInfo, userInfo, scenarioInfo, summaryInfo, customPromptInfo, chatHistory } = parseJanitorInput(incomingMessages);
     const commandTags = parseCommandsFromMessages(incomingMessages);
     const commandDefinitions = await getCommandDefinitions(commandTags);
 
@@ -114,7 +123,8 @@ async function buildFinalMessages(provider, incomingMessages, reqId) {
         .replace(/<<CHARACTER_INFO>>/g, characterInfo)
         .replace(/<<SCENARIO_INFO>>/g, scenarioInfo)
         .replace(/<<USER_INFO>>/g, userInfo)
-        .replace(/<<SUMMARY>>/g, summaryInfo);
+        .replace(/<<SUMMARY>>/g, summaryInfo)
+        .replace(/<<CUSTOM_PROMPT>>/g, customPromptInfo);
 
     const finalMessages = [];
     let historyInjected = false;
@@ -137,7 +147,9 @@ async function buildFinalMessages(provider, incomingMessages, reqId) {
         // Process each item for this position. (Usually just one, but can be multiple for injections).
         for (const item of contentSource) {
             const content = replacer(item.content || '');
-            const role = item.role;
+            // If the block is an 'Additional Commands' injection point, use the role from the structure block.
+            // Otherwise, use the role from the item itself (either another command type or a standard block).
+            const role = block.block_type === 'Additional Commands' ? block.role : item.role;
 
             // The highest priority is to check for and inject the chat history.
             if (content.includes('<<CHAT_HISTORY>>')) {
@@ -167,7 +179,7 @@ async function buildFinalMessages(provider, incomingMessages, reqId) {
     }
     
     console.log(`[${reqId}] Prompt construction complete. Final message count: ${finalMessages.length}`);
-    return finalMessages;
+    return { finalMessages, characterName, commandTags };
 }
 
 

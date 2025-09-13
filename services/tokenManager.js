@@ -14,15 +14,32 @@ const state = {
 
 /**
  * Initializes the token manager by loading all tokens from the database into memory.
+ * Also checks for and disables any tokens that have expired since the last run.
  */
 async function initialize() {
     console.log('[Token Manager] Initializing...');
     try {
-        const result = await pool.query('SELECT id, name, token, rpm, is_enabled FROM user_tokens');
+        const result = await pool.query('SELECT id, name, token, rpm, is_enabled, expires_at FROM user_tokens');
         state.tokens.clear();
+        const now = new Date();
+        const expiredTokenIds = [];
+
         for (const tokenData of result.rows) {
+            // Check if the token is active but has an expiration date that has passed
+            if (tokenData.is_enabled && tokenData.expires_at && new Date(tokenData.expires_at) < now) {
+                console.warn(`[Token Manager] Token '${tokenData.name}' (ID: ${tokenData.id}) has expired. Marking as disabled.`);
+                expiredTokenIds.push(tokenData.id);
+                tokenData.is_enabled = false; // Mark as disabled in memory
+            }
             state.tokens.set(tokenData.token, tokenData);
         }
+
+        // If we found any expired tokens, update their status in the database
+        if (expiredTokenIds.length > 0) {
+            await pool.query('UPDATE user_tokens SET is_enabled = false, updated_at = NOW() WHERE id = ANY($1)', [expiredTokenIds]);
+            console.log(`[Token Manager] Successfully disabled ${expiredTokenIds.length} expired token(s) in the database.`);
+        }
+
         console.log(`[Token Manager] Loaded ${state.tokens.size} tokens into memory.`);
     } catch (error) {
         console.error('[Token Manager] CRITICAL: Error initializing tokens. Check DB connection and table.', error);
@@ -45,6 +62,11 @@ async function verifyAndRateLimit(tokenValue) {
 
     if (!tokenData.is_enabled) {
         return { success: false, status: 403, message: 'Token is disabled.' };
+    }
+
+    // NEW: Live check for expiration
+    if (tokenData.expires_at && new Date(tokenData.expires_at) < new Date()) {
+        return { success: false, status: 403, message: 'Token has expired.' };
     }
 
     // Rate Limiting Logic
@@ -84,7 +106,7 @@ function cleanupRequestTimestamps() {
  * Returns all tokens for the admin panel.
  */
 async function getAdminTokens() {
-    const result = await pool.query('SELECT id, name, token, rpm, is_enabled, created_at, updated_at FROM user_tokens ORDER BY name');
+    const result = await pool.query('SELECT id, name, token, rpm, is_enabled, created_at, updated_at, expires_at FROM user_tokens ORDER BY name');
     return result.rows;
 }
 
@@ -94,9 +116,13 @@ async function getAdminTokens() {
  * @returns {object} The full token object that was saved.
  */
 async function saveToken(tokenData) {
-    const { id, name, rpm, is_enabled, regenerate } = tokenData;
+    // Add expires_at to destructuring
+    const { id, name, rpm, is_enabled, regenerate, expires_at } = tokenData;
     let tokenValue;
     let savedToken;
+
+    // If expires_at is an empty string, convert it to null for the database
+    const expirationDate = expires_at ? expires_at : null;
 
     if (id && !regenerate) { // Update existing token
         const existing = await pool.query('SELECT token FROM user_tokens WHERE id = $1', [id]);
@@ -104,8 +130,8 @@ async function saveToken(tokenData) {
         tokenValue = existing.rows[0].token;
 
         const result = await pool.query(
-            'UPDATE user_tokens SET name = $1, rpm = $2, is_enabled = $3, updated_at = NOW() WHERE id = $4 RETURNING *',
-            [name, rpm, is_enabled, id]
+            'UPDATE user_tokens SET name = $1, rpm = $2, is_enabled = $3, expires_at = $4, updated_at = NOW() WHERE id = $5 RETURNING *',
+            [name, rpm, is_enabled, expirationDate, id]
         );
         savedToken = result.rows[0];
         // Update in-memory cache
@@ -121,14 +147,14 @@ async function saveToken(tokenData) {
             }
 
             const result = await pool.query(
-                'UPDATE user_tokens SET name = $1, rpm = $2, is_enabled = $3, token = $4, updated_at = NOW() WHERE id = $5 RETURNING *',
-                [name, rpm, is_enabled, tokenValue, id]
+                'UPDATE user_tokens SET name = $1, rpm = $2, is_enabled = $3, token = $4, expires_at = $5, updated_at = NOW() WHERE id = $6 RETURNING *',
+                [name, rpm, is_enabled, tokenValue, expirationDate, id]
             );
             savedToken = result.rows[0];
         } else { // Create new
             const result = await pool.query(
-                'INSERT INTO user_tokens (name, token, rpm, is_enabled) VALUES ($1, $2, $3, $4) RETURNING *',
-                [name, tokenValue, rpm, is_enabled]
+                'INSERT INTO user_tokens (name, token, rpm, is_enabled, expires_at) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+                [name, tokenValue, rpm, is_enabled, expirationDate]
             );
             savedToken = result.rows[0];
         }
