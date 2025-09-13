@@ -83,7 +83,6 @@ async function initialize() {
     console.log('[Key Manager] Initialization complete.');
 }
 
-// --- MODIFIED: The function now accepts providerConfig to use the correct URL and Model ---
 async function testClaudeKey(providerConfig, key) {
     const testUrl = `${providerConfig.apiBaseUrl}/v1/messages`;
     const testPayload = {
@@ -98,7 +97,8 @@ async function testClaudeKey(providerConfig, key) {
     };
 
     try {
-        await axios.post(testUrl, testPayload, { headers, timeout: 10000 });
+        // MODIFIED: Increased timeout from 10000 to 20000
+        await axios.post(testUrl, testPayload, { headers, timeout: 20000 });
         key.status = 'active';
     } catch (error) {
         const status = error.response?.status;
@@ -121,7 +121,6 @@ async function testClaudeKey(providerConfig, key) {
  */
 async function testCustomKey(providerConfig, key) {
     if (providerConfig.providerType === 'claude') {
-        // --- MODIFIED: Pass the full providerConfig to the test function ---
         return await testClaudeKey(providerConfig, key);
     }
     
@@ -138,7 +137,8 @@ async function testCustomKey(providerConfig, key) {
     };
 
     try {
-        await axios.post(testUrl, testPayload, { headers, timeout: 10000 });
+        // MODIFIED: Increased timeout from 10000 to 20000
+        await axios.post(testUrl, testPayload, { headers, timeout: 20000 });
         key.status = 'active';
     } catch (error) {
         const status = error.response?.status;
@@ -166,7 +166,6 @@ async function testKey(provider, key) {
     try {
         switch (provider) {
             case 'claude':
-                // --- MODIFIED: Pass the config for the built-in provider as well ---
                 const claudeConfig = state.providers['claude'].config;
                 return await testClaudeKey(claudeConfig, key);
             case 'gemini':
@@ -199,7 +198,8 @@ async function testKey(provider, key) {
                 return;
         }
 
-        await axios.post(testUrl, testPayload, { headers, timeout: 10000 });
+        // MODIFIED: Increased timeout from 10000 to 20000
+        await axios.post(testUrl, testPayload, { headers, timeout: 20000 });
         key.status = 'active';
     } catch (error) {
         const status = error.response?.status;
@@ -275,12 +275,14 @@ function deactivateKey(provider, keyValue, reason) {
         console.log(`[Key Manager] Deactivated key for ${provider} due to: ${reason}. Key ending in ...${keyValue.slice(-4)}`);
     }
 }
+
 function recordSuccess(provider, keyValue) {
     const key = state.providers[provider]?.keys.find(k => k.value === keyValue);
     if (key) {
         key.consecutiveFails = 0;
     }
 }
+
 function recordFailure(provider, keyValue) {
     const key = state.providers[provider]?.keys.find(k => k.value === keyValue);
     if (key && key.status === 'active') {
