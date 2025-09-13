@@ -52,7 +52,6 @@
                         <h3>Total Output Tokens</h3>
                         <p id="stat-output-tokens">Loading...</p>
                     </div>
-                    <!-- NEW: Server Time Card -->
                     <div class="stat-card">
                         <h3>Server Time (UTC)</h3>
                         <p id="stat-server-time" style="font-size: 1.8em; line-height: 1.4;">Loading...</p>
@@ -97,18 +96,30 @@
                         <h3 id="command-form-title">Add New Command</h3>
                         <form id="command-form">
                             <input type="hidden" id="cmd_id">
-                            <input id="cmd_tag" placeholder="COMMAND_TAG (e.g., JAILBREAK)" required>
-                            <input id="cmd_name" placeholder="Block Name (e.g., 'JB v4')" required>
+
+                            <label for="cmd_tag">Command Tag (User-facing, e.g., JAILBREAK_V4)</label>
+                            <input id="cmd_tag" placeholder="COMMAND_TAG" required>
+
+                            <label for="cmd_id_internal">Command ID (Internal, unique, e.g., jb_v4_deepseek)</label>
+                            <input id="cmd_id_internal" placeholder="unique-command-id-for-replacement">
+                            <p class="muted" style="margin-top: -10px; font-size: 0.8em;">Required only for 'Prompt Injecting' type. No spaces or special characters.</p>
+
+                            <label for="cmd_name">Block Name (e.g., 'JB v4')</label>
+                            <input id="cmd_name" placeholder="Descriptive Name" required>
+
                             <select id="cmd_role">
                                 <option value="system">system</option>
                                 <option value="user">user</option>
                                 <option value="assistant">assistant</option>
                             </select>
+
                             <select id="cmd_type">
                                 <option value="Jailbreak">Jailbreak</option>
                                 <option value="Additional Commands">Additional Commands</option>
                                 <option value="Prefill">Prefill</option>
+                                <option value="Prompt Injecting">Prompt Injecting</option>
                             </select>
+
                             <textarea id="cmd_content" placeholder="Content to be injected..."></textarea>
                             <div class="action-buttons">
                                 <button type="button" id="cmd_clear_btn" class="btn-secondary">Clear Form</button>

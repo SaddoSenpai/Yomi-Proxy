@@ -81,11 +81,42 @@ async function getCommandDefinitions(commandTags) {
 }
 
 /**
- * --- REWRITTEN FROM SCRATCH (FINAL): The definitive prompt building logic. ---
+ * --- REWRITTEN & CORRECTED ---
  * This version uses a robust single-pass process to guarantee positional integrity.
  * It directly builds the final message array in the correct order.
  */
 async function buildFinalMessages(provider, incomingMessages, reqId) {
+    // A map to store variables for this request only.
+    const requestVariables = new Map();
+
+    // Helper to process our new macros.
+    const processMacros = (text) => {
+        let processedText = text;
+
+        // 1. Process all SET macros first to populate the variables.
+        const setMacroRegex = /{{setglobalvar::([^:]+)::([\s\S]*?)}}/g;
+        processedText = processedText.replace(setMacroRegex, (match, name, value) => {
+            console.log(`[${reqId}] Macro: Setting variable '${name}' to '${value}'`);
+            requestVariables.set(name.trim(), value);
+            return ''; // The set macro itself is replaced with an empty string.
+        });
+
+        // 2. Process all GET macros to substitute the variables.
+        const getMacroRegex = /{{getglobalvar::([^}]+)}}/g;
+        processedText = processedText.replace(getMacroRegex, (match, name) => {
+            const trimmedName = name.trim();
+            if (requestVariables.has(trimmedName)) {
+                const value = requestVariables.get(trimmedName);
+                console.log(`[${reqId}] Macro: Getting variable '${trimmedName}', found value '${value}'`);
+                return value;
+            }
+            console.warn(`[${reqId}] Macro: Variable '${trimmedName}' not found.`);
+            return ''; // Replace with empty string if variable doesn't exist.
+        });
+
+        return processedText;
+    };
+
     let structureToUse = await getStructure(provider);
     if (structureToUse.length === 0 && provider !== 'default') {
         console.log(`[${reqId}] No structure for '${provider}', falling back to 'default'.`);
@@ -129,41 +160,49 @@ async function buildFinalMessages(provider, incomingMessages, reqId) {
     const finalMessages = [];
     let historyInjected = false;
 
-    // This single loop iterates through the structure from the database in the correct order.
     for (const block of structureToUse) {
-        const blockType = block.block_type;
+        let currentBlock = { ...block }; // Work with a copy
 
-        // Determine the source of content for this position in the structure.
-        // It's either the block itself or a list of commands for injection points.
+        // --- REWRITTEN: Prompting Fallback Logic ---
+        // This block type is now the default content.
+        if (currentBlock.block_type === 'Prompting Fallback' && currentBlock.replacement_command_id) {
+            // Find if any of the commands TRIGGERED BY THE USER has a command_id that matches our replacement_id.
+            const overrideCommand = commandDefinitions.find(cmd => cmd.command_id === currentBlock.replacement_command_id);
+            
+            if (overrideCommand) {
+                console.log(`[${reqId}] Fallback overridden: Block '${currentBlock.name}' is being replaced by command with ID '${overrideCommand.command_id}' (triggered by tag <${overrideCommand.command_tag}>).`);
+                // Replace the block's content with the command's content. The block's role is respected.
+                currentBlock.content = overrideCommand.block_content;
+            } else {
+                 console.log(`[${reqId}] Fallback active: Using default content for block '${currentBlock.name}'.`);
+            }
+        }
+        // --- End of Fallback Logic ---
+
+        const blockType = currentBlock.block_type;
         let contentSource = [];
         if (blockType === 'Conditional Prefill' && hasPrefillCommand) {
-            continue; // Skip this block entirely if a prefill command is active.
+            continue;
         } else if (['Jailbreak', 'Additional Commands', 'Prefill'].includes(blockType)) {
             contentSource = commandsByType[blockType] || [];
         } else {
-            contentSource = [block]; // Standard block or a Conditional Prefill that should run.
+            contentSource = [currentBlock];
         }
 
-        // Process each item for this position. (Usually just one, but can be multiple for injections).
         for (const item of contentSource) {
-            const content = replacer(item.content || '');
-            // If the block is an 'Additional Commands' injection point, use the role from the structure block.
-            // Otherwise, use the role from the item itself (either another command type or a standard block).
+            // Apply JanitorAI placeholders first, then process our new macros
+            let content = replacer(item.content || '');
+            content = processMacros(content);
+
             const role = block.block_type === 'Additional Commands' ? block.role : item.role;
 
-            // The highest priority is to check for and inject the chat history.
             if (content.includes('<<CHAT_HISTORY>>')) {
                 const parts = content.split('<<CHAT_HISTORY>>');
-                if (parts[0].trim()) {
-                    finalMessages.push({ role, content: parts[0] });
-                }
+                if (parts[0].trim()) finalMessages.push({ role, content: parts[0] });
                 finalMessages.push(...chatHistory);
-                if (parts[1].trim()) {
-                    finalMessages.push({ role, content: parts[1] });
-                }
+                if (parts[1].trim()) finalMessages.push({ role, content: parts[1] });
                 historyInjected = true;
             } else {
-                // If no history placeholder, just add the content.
                 if (content.trim()) {
                     finalMessages.push({ role, content });
                 }
@@ -171,8 +210,6 @@ async function buildFinalMessages(provider, incomingMessages, reqId) {
         }
     }
 
-    // Fallback: If the user forgot to include the placeholder in their structure,
-    // append the history to the very end to prevent it from being lost.
     if (!historyInjected) {
         console.warn(`[${reqId}] <<CHAT_HISTORY>> placeholder not found in structure. Appending history to the end.`);
         finalMessages.push(...chatHistory);
@@ -183,7 +220,7 @@ async function buildFinalMessages(provider, incomingMessages, reqId) {
 }
 
 
-// --- Database functions (unchanged) ---
+// --- Database functions ---
 async function getStructure(provider) {
     const res = await pool.query('SELECT * FROM global_prompt_blocks WHERE provider = $1 ORDER BY position', [provider]);
     return res.rows;
@@ -197,8 +234,8 @@ async function setStructure(provider, blocks) {
         for (let i = 0; i < blocks.length; i++) {
             const block = blocks[i];
             await client.query(
-                'INSERT INTO global_prompt_blocks (provider, name, role, content, position, is_enabled, block_type) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-                [provider, block.name, block.role, block.content, i, block.is_enabled, block.block_type]
+                'INSERT INTO global_prompt_blocks (provider, name, role, content, position, is_enabled, block_type, replacement_command_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+                [provider, block.name, block.role, block.content, i, block.is_enabled, block.block_type, block.replacement_command_id || null]
             );
         }
         await client.query('COMMIT');
@@ -216,16 +253,21 @@ async function getCommands() {
 }
 
 async function saveCommand(commandData) {
-    const { id, command_tag, block_name, block_role, block_content, command_type } = commandData;
+    const { id, command_tag, command_id, block_name, block_role, block_content, command_type } = commandData;
+
+    if (!command_id && command_type === 'Prompt Injecting') {
+        throw new Error('A Command ID is required for the "Prompt Injecting" type.');
+    }
+
     if (id) {
         await pool.query(
-            'UPDATE commands SET command_tag = $1, block_name = $2, block_role = $3, block_content = $4, command_type = $5, updated_at = NOW() WHERE id = $6',
-            [command_tag.toUpperCase(), block_name, block_role, block_content, command_type, id]
+            'UPDATE commands SET command_tag = $1, block_name = $2, block_role = $3, block_content = $4, command_type = $5, command_id = $6, updated_at = NOW() WHERE id = $7',
+            [command_tag.toUpperCase(), block_name, block_role, block_content, command_type, command_id, id]
         );
     } else {
         await pool.query(
-            'INSERT INTO commands (command_tag, block_name, block_role, block_content, command_type) VALUES ($1, $2, $3, $4, $5)',
-            [command_tag.toUpperCase(), block_name, block_role, block_content, command_type]
+            'INSERT INTO commands (command_tag, block_name, block_role, block_content, command_type, command_id) VALUES ($1, $2, $3, $4, $5, $6)',
+            [command_tag.toUpperCase(), block_name, block_role, block_content, command_type, command_id]
         );
     }
 }

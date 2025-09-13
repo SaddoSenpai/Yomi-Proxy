@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) { console.error('Failed to fetch stats:', error); }
     }
     
-    // --- NEW: Server Clock ---
+    // --- Server Clock ---
     let serverClockInterval;
     async function startServerClock() {
         try {
@@ -115,6 +115,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let pristineBlocks = '[]';
     let currentlyEditingIndex = -1;
 
+    blocksList.addEventListener('change', (event) => {
+        if (event.target.classList.contains('edit-block-type')) {
+            const blockItem = event.target.closest('.block-item');
+            const replacementIdWrapper = blockItem.querySelector('.edit-replacement-id-wrapper');
+            if (event.target.value === 'Prompting Fallback') {
+                replacementIdWrapper.style.display = 'block';
+            } else {
+                replacementIdWrapper.style.display = 'none';
+            }
+        }
+    });
+
     function updateSaveButtonState() {
         const saveBtn = document.getElementById('saveStructureBtn');
         const hasChanges = JSON.stringify(currentBlocks) !== pristineBlocks;
@@ -139,6 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentBlocks.forEach((block, index) => {
             const isEditing = index === currentlyEditingIndex;
             const isInjection = ['Jailbreak', 'Additional Commands', 'Prefill'].includes(block.block_type);
+            const isFallback = block.block_type === 'Prompting Fallback';
             
             const el = document.createElement('div');
             el.className = `block-item ${isEditing ? 'is-editing' : ''} ${isInjection ? 'is-injection-point' : ''}`;
@@ -146,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="block-header">
                     <div class="block-info">
                         <span class="block-name">${block.name || 'Unnamed Block'}</span>
-                        <span class="block-role">(${block.role}) ${isInjection ? '[Injection Point]' : ''}</span>
+                        <span class="block-role">(${block.role}) ${isInjection ? '[Injection Point]' : ''} ${isFallback ? '[Fallback]' : ''}</span>
                     </div>
                     <div class="block-actions">
                         <div class="move-controls">
@@ -178,7 +191,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         <option value="Additional Commands" ${block.block_type === 'Additional Commands' ? 'selected' : ''}>Commands Injection</option>
                         <option value="Prefill" ${block.block_type === 'Prefill' ? 'selected' : ''}>Prefill Injection</option>
                         <option value="Conditional Prefill" ${block.block_type === 'Conditional Prefill' ? 'selected' : ''}>Conditional Prefill</option>
+                        <option value="Prompting Fallback" ${isFallback ? 'selected' : ''}>Prompting Fallback</option>
                     </select>
+
+                    <div class="edit-replacement-id-wrapper" style="display: ${isFallback ? 'block' : 'none'}; margin-top: 15px;">
+                        <label>Replacement Command ID</label>
+                        <input class="edit-replacement-id" value="${block.replacement_command_id || ''}" placeholder="e.g., writing_style_gemini">
+                        <p class="muted" style="margin-top: -10px; font-size: 0.8em;">If a user triggers a command with this ID, it will replace this block's content.</p>
+                    </div>
+
                     <textarea class="edit-content" placeholder="Block content..." ${isInjection ? 'disabled' : ''}>${block.content || ''}</textarea>
                     <div class="action-buttons">
                         <button class="btn-primary" onclick="saveBlockEdit(${index})">Save Changes</button>
@@ -218,13 +239,27 @@ document.addEventListener('DOMContentLoaded', () => {
         currentBlocks[index].role = blockItem.querySelector('.edit-role').value;
         currentBlocks[index].block_type = blockItem.querySelector('.edit-block-type').value;
         currentBlocks[index].content = blockItem.querySelector('.edit-content').value;
+        
+        if (currentBlocks[index].block_type === 'Prompting Fallback') {
+            currentBlocks[index].replacement_command_id = blockItem.querySelector('.edit-replacement-id').value.trim();
+        } else {
+            currentBlocks[index].replacement_command_id = null;
+        }
+
         currentlyEditingIndex = -1;
         renderBlocks();
         updateSaveButtonState();
     };
 
     document.getElementById('addBlockBtn').onclick = () => {
-        currentBlocks.push({ name: 'New Block', role: 'system', content: '', is_enabled: true, block_type: 'Standard' });
+        currentBlocks.push({ 
+            name: 'New Block', 
+            role: 'system', 
+            content: '', 
+            is_enabled: true, 
+            block_type: 'Standard',
+            replacement_command_id: null
+        });
         currentlyEditingIndex = currentBlocks.length - 1;
         renderBlocks();
         updateSaveButtonState();
@@ -269,6 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="command-item">
                 <div class="cmd-info">
                     <strong><code>&lt;${cmd.command_tag}&gt;</code></strong> - ${cmd.block_name} (${cmd.command_type})
+                    ${cmd.command_id ? `<br><span style="font-size: 0.8em; color: var(--text-muted);">ID: ${cmd.command_id}</span>` : ''}
                 </div>
                 <div class="cmd-actions">
                     <button class="btn-secondary" onclick="editCommand(${cmd.id})">Edit</button>
@@ -284,6 +320,7 @@ document.addEventListener('DOMContentLoaded', () => {
         commandFormTitle.textContent = 'Edit Command';
         document.getElementById('cmd_id').value = cmd.id;
         document.getElementById('cmd_tag').value = cmd.command_tag;
+        document.getElementById('cmd_id_internal').value = cmd.command_id || '';
         document.getElementById('cmd_name').value = cmd.block_name;
         document.getElementById('cmd_role').value = cmd.block_role;
         document.getElementById('cmd_type').value = cmd.command_type;
@@ -311,6 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const body = {
             id: document.getElementById('cmd_id').value || null,
             command_tag: document.getElementById('cmd_tag').value,
+            command_id: document.getElementById('cmd_id_internal').value.trim() || null,
             block_name: document.getElementById('cmd_name').value,
             block_role: document.getElementById('cmd_role').value,
             command_type: document.getElementById('cmd_type').value,
