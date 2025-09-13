@@ -100,9 +100,9 @@
                             <label for="cmd_tag">Command Tag (User-facing, e.g., JAILBREAK_V4)</label>
                             <input id="cmd_tag" placeholder="COMMAND_TAG" required>
 
-                            <label for="cmd_id_internal">Command ID (Internal, unique, e.g., jb_v4_deepseek)</label>
-                            <input id="cmd_id_internal" placeholder="unique-command-id-for-replacement">
-                            <p class="muted" style="margin-top: -10px; font-size: 0.8em;">Required only for 'Prompt Injecting' type. No spaces or special characters.</p>
+                            <label for="cmd_id_internal">Command ID (Internal Identifier)</label>
+                            <input id="cmd_id_internal" placeholder="reusable-replacement-id">
+                            <p class="muted" style="margin-top: -10px; font-size: 0.8em;">Required for 'Prompt Injecting' type. This ID can be reused across different commands to target the same fallback block.</p>
 
                             <label for="cmd_name">Block Name (e.g., 'JB v4')</label>
                             <input id="cmd_name" placeholder="Descriptive Name" required>
