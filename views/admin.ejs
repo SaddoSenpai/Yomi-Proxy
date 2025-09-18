@@ -262,12 +262,9 @@
                     <div class="log-settings-card">
                         <h3>Logging Configuration</h3>
                         <form id="log-settings-form">
-                            <!-- Hidden radio buttons for functionality -->
                             <input type="radio" id="log-enabled" name="log_mode" value="enabled" class="hidden-radio">
                             <input type="radio" id="log-auto_purge" name="log_mode" value="auto_purge" class="hidden-radio">
                             <input type="radio" id="log-disabled" name="log_mode" value="disabled" class="hidden-radio">
-
-                            <!-- Custom styled options -->
                             <div class="log-setting-option" data-value="enabled">
                                 <h4>Enabled</h4>
                                 <p class="muted">Store all requests until manually deleted.</p>
@@ -280,12 +277,10 @@
                                 <h4>Disabled</h4>
                                 <p class="muted">Do not store any request logs.</p>
                             </div>
-
                             <div id="purge-hours-wrapper" style="display: none; margin-top: 15px;">
                                 <label for="log_purge_hours">Purge logs older than (hours):</label>
                                 <input type="number" id="log_purge_hours" min="1" value="24">
                             </div>
-
                             <div class="action-buttons">
                                 <button type="submit" class="btn-primary">Save Settings</button>
                             </div>

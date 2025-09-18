@@ -17,6 +17,8 @@ function parseJanitorInput(incomingMessages) {
   let scenarioInfo = '';
   let summaryInfo = '';
   let customPromptInfo = ''; 
+  let unparsedText = ''; // <-- NEW: To store leftover text
+
   const fullContent = (incomingMessages || []).map(m => m.content || '').join('\n\n');
   
   const charRegex = /<(.+?)'s Persona>([\s\S]*?)<\/\1's Persona>/;
@@ -50,9 +52,19 @@ function parseJanitorInput(incomingMessages) {
     customPromptInfo = customPromptMatch[1].trim();
   }
 
+  // --- NEW LOGIC: Capture Unparsed Text from the first message ---
+  if (incomingMessages && incomingMessages.length > 0 && incomingMessages[0].role === 'user') {
+    const firstMessageContent = incomingMessages[0].content || '';
+    // Regex to find and remove ALL known structured tags
+    const allTagsRegex = /<(.+?)'s Persona>[\s\S]*?<\/\1's Persona>|<UserPersona>[\s\S]*?<\/UserPersona>|<scenario>[\s\S]*?<\/scenario>|<summary>[\s\S]*?<\/summary>|<Custom_Prompt>[\s\S]*?<\/Custom_Prompt>/g;
+    unparsedText = firstMessageContent.replace(allTagsRegex, '').trim();
+  }
+  // --- END NEW LOGIC ---
+
   const chatHistory = (incomingMessages || [])
     .filter(m => {
         const content = m.content || '';
+        // This filter now effectively separates the setup prompt (handled by parsing) from the actual chat dialogue.
         return !content.includes("'s Persona>") && !content.includes("<UserPersona>") && !content.includes("<scenario>") && !content.includes("<summary>") && !content.includes("<Custom_Prompt>");
     })
     .map(m => {
@@ -63,7 +75,8 @@ function parseJanitorInput(incomingMessages) {
         return m;
     });
 
-  return { characterName, characterInfo, userInfo, scenarioInfo, summaryInfo, customPromptInfo, chatHistory };
+  // Return the new unparsed text along with existing data
+  return { characterName, characterInfo, userInfo, scenarioInfo, summaryInfo, customPromptInfo, unparsedText, chatHistory };
 }
 
 function parseCommandsFromMessages(messages) {
@@ -80,28 +93,18 @@ async function getCommandDefinitions(commandTags) {
     return result.rows;
 }
 
-/**
- * --- REWRITTEN & CORRECTED ---
- * This version uses a robust single-pass process to guarantee positional integrity.
- * It directly builds the final message array in the correct order.
- */
 async function buildFinalMessages(provider, incomingMessages, reqId) {
-    // A map to store variables for this request only.
     const requestVariables = new Map();
 
-    // Helper to process our new macros.
     const processMacros = (text) => {
         let processedText = text;
-
-        // 1. Process all SET macros first to populate the variables.
         const setMacroRegex = /{{setglobalvar::([^:]+)::([\s\S]*?)}}/g;
         processedText = processedText.replace(setMacroRegex, (match, name, value) => {
             console.log(`[${reqId}] Macro: Setting variable '${name}' to '${value}'`);
             requestVariables.set(name.trim(), value);
-            return ''; // The set macro itself is replaced with an empty string.
+            return '';
         });
 
-        // 2. Process all GET macros to substitute the variables.
         const getMacroRegex = /{{getglobalvar::([^}]+)}}/g;
         processedText = processedText.replace(getMacroRegex, (match, name) => {
             const trimmedName = name.trim();
@@ -111,7 +114,7 @@ async function buildFinalMessages(provider, incomingMessages, reqId) {
                 return value;
             }
             console.warn(`[${reqId}] Macro: Variable '${trimmedName}' not found.`);
-            return ''; // Replace with empty string if variable doesn't exist.
+            return '';
         });
 
         return processedText;
@@ -132,7 +135,7 @@ async function buildFinalMessages(provider, incomingMessages, reqId) {
     
     console.log(`[${reqId}] Processing request with global structure for provider: ${provider}`);
 
-    const { characterName, characterInfo, userInfo, scenarioInfo, summaryInfo, customPromptInfo, chatHistory } = parseJanitorInput(incomingMessages);
+    const { characterName, characterInfo, userInfo, scenarioInfo, summaryInfo, customPromptInfo, unparsedText, chatHistory } = parseJanitorInput(incomingMessages);
     const commandTags = parseCommandsFromMessages(incomingMessages);
     const commandDefinitions = await getCommandDefinitions(commandTags);
 
@@ -161,23 +164,27 @@ async function buildFinalMessages(provider, incomingMessages, reqId) {
     let historyInjected = false;
 
     for (const block of structureToUse) {
-        let currentBlock = { ...block }; // Work with a copy
+        // --- NEW: Handle Unparsed Text Injection block type ---
+        if (block.block_type === 'Unparsed Text Injection') {
+            if (unparsedText) { // Only add if there is unparsed text
+                console.log(`[${reqId}] Injecting unparsed text into a '${block.role}' role block.`);
+                finalMessages.push({ role: block.role, content: unparsedText });
+            }
+            continue; // This block's purpose is fulfilled, move to the next one
+        }
 
-        // --- REWRITTEN: Prompting Fallback Logic ---
-        // This block type is now the default content.
+        let currentBlock = { ...block };
+
         if (currentBlock.block_type === 'Prompting Fallback' && currentBlock.replacement_command_id) {
-            // Find if any of the commands TRIGGERED BY THE USER has a command_id that matches our replacement_id.
             const overrideCommand = commandDefinitions.find(cmd => cmd.command_id === currentBlock.replacement_command_id);
             
             if (overrideCommand) {
                 console.log(`[${reqId}] Fallback overridden: Block '${currentBlock.name}' is being replaced by command with ID '${overrideCommand.command_id}' (triggered by tag <${overrideCommand.command_tag}>).`);
-                // Replace the block's content with the command's content. The block's role is respected.
                 currentBlock.content = overrideCommand.block_content;
             } else {
                  console.log(`[${reqId}] Fallback active: Using default content for block '${currentBlock.name}'.`);
             }
         }
-        // --- End of Fallback Logic ---
 
         const blockType = currentBlock.block_type;
         let contentSource = [];
@@ -190,10 +197,8 @@ async function buildFinalMessages(provider, incomingMessages, reqId) {
         }
 
         for (const item of contentSource) {
-            // Apply JanitorAI placeholders first, then process our new macros
             let content = replacer(item.content || '');
             content = processMacros(content);
-
             const role = block.block_type === 'Additional Commands' ? block.role : item.role;
 
             if (content.includes('<<CHAT_HISTORY>>')) {
@@ -219,8 +224,6 @@ async function buildFinalMessages(provider, incomingMessages, reqId) {
     return { finalMessages, characterName, commandTags };
 }
 
-
-// --- Database functions ---
 async function getStructure(provider) {
     const res = await pool.query('SELECT * FROM global_prompt_blocks WHERE provider = $1 ORDER BY position', [provider]);
     return res.rows;

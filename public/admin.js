@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
         blocksList.innerHTML = '';
         currentBlocks.forEach((block, index) => {
             const isEditing = index === currentlyEditingIndex;
-            const isInjection = ['Jailbreak', 'Additional Commands', 'Prefill'].includes(block.block_type);
+            const isInjection = ['Jailbreak', 'Additional Commands', 'Prefill', 'Unparsed Text Injection'].includes(block.block_type);
             const isFallback = block.block_type === 'Prompting Fallback';
             
             const el = document.createElement('div');
@@ -192,6 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <option value="Prefill" ${block.block_type === 'Prefill' ? 'selected' : ''}>Prefill Injection</option>
                         <option value="Conditional Prefill" ${block.block_type === 'Conditional Prefill' ? 'selected' : ''}>Conditional Prefill</option>
                         <option value="Prompting Fallback" ${isFallback ? 'selected' : ''}>Prompting Fallback</option>
+                        <option value="Unparsed Text Injection" ${block.block_type === 'Unparsed Text Injection' ? 'selected' : ''}>Unparsed Text Injection</option>
                     </select>
 
                     <div class="edit-replacement-id-wrapper" style="display: ${isFallback ? 'block' : 'none'}; margin-top: 15px;">
