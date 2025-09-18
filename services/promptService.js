@@ -10,32 +10,24 @@ class UserInputError extends Error {
   }
 }
 
-/**
- * --- COMPLETELY REWRITTEN PARSING LOGIC ---
- * This new function is designed for modern clients like SillyTavern/JanitorAI.
- * It treats the first message as a setup block, extracts specific known tags,
- * and captures everything else as a single "unparsed" system prompt.
- */
 function parseJanitorInput(incomingMessages) {
   let userInfo = '';
   let customPromptInfo = ''; 
   let unparsedText = '';
-  let characterName = 'Character'; // Keep for {{char}} macro as a fallback
+  let characterName = 'Character';
 
   if (!incomingMessages || incomingMessages.length === 0) {
     return { userInfo, customPromptInfo, unparsedText, characterName, chatHistory: [] };
   }
 
-  // The first message is considered the main setup/system prompt.
   const setupMessageContent = incomingMessages[0].content || '';
   let remainingText = setupMessageContent;
 
-  // 1. Extract specific, known tags and remove them from the main text block.
   const userRegex = /<UserPersona>([\s\S]*?)<\/UserPersona>/;
   const userMatch = remainingText.match(userRegex);
   if (userMatch) {
     userInfo = userMatch[1].trim();
-    remainingText = remainingText.replace(userMatch[0], ''); // userMatch[0] is the full tag + content
+    remainingText = remainingText.replace(userMatch[0], '');
   }
 
   const customPromptRegex = /<Custom_Prompt>([\s\S]*?)<\/Custom_Prompt>/;
@@ -45,17 +37,14 @@ function parseJanitorInput(incomingMessages) {
     remainingText = remainingText.replace(customPromptMatch[0], '');
   }
 
-  // 2. Attempt to parse character name for the {{char}} macro, but don't remove it from the unparsed text.
   const charRegex = /<(.+?)'s Persona>/;
-  const charMatch = setupMessageContent.match(charRegex); // Match against original content
+  const charMatch = setupMessageContent.match(charRegex);
   if (charMatch) {
     characterName = charMatch[1];
   }
 
-  // 3. Whatever is left over is the unparsed system/character prompt.
   unparsedText = remainingText.trim();
 
-  // 4. The rest of the messages are the actual conversation history.
   const chatHistory = incomingMessages.slice(1).map(m => {
       if (m.role === 'assistant' && m.content && m.content.includes('<w>')) {
           console.log('[History Cleaning] Found <w> tag in assistant message. Cleaning for next prompt.');
@@ -114,18 +103,21 @@ async function buildFinalMessages(provider, incomingMessages, reqId) {
         structureToUse = await getStructure('default');
     }
 
+    // --- LOGIC CORRECTION ---
+    // Parse commands from the ENTIRE set of incoming messages BEFORE splitting them up.
+    const commandTags = parseCommandsFromMessages(incomingMessages);
+    const commandDefinitions = await getCommandDefinitions(commandTags);
+    // --- END LOGIC CORRECTION ---
+
     if (structureToUse.length === 0) {
         console.log(`[${reqId}] No global structure found. Passing messages through directly.`);
         const { characterName } = parseJanitorInput(incomingMessages);
-        const commandTags = parseCommandsFromMessages(incomingMessages);
         return { finalMessages: incomingMessages, characterName, commandTags };
     }
     
     console.log(`[${reqId}] Processing request with global structure for provider: ${provider}`);
 
     const { characterName, userInfo, customPromptInfo, unparsedText, chatHistory } = parseJanitorInput(incomingMessages);
-    const commandTags = parseCommandsFromMessages(incomingMessages);
-    const commandDefinitions = await getCommandDefinitions(commandTags);
 
     const prefillCommands = commandDefinitions.filter(cmd => cmd.command_type === 'Prefill');
     if (prefillCommands.length > 1) {
@@ -140,7 +132,6 @@ async function buildFinalMessages(provider, incomingMessages, reqId) {
         }
     });
     
-    // Note: The replacer no longer needs characterInfo, scenarioInfo etc. as they are now part of `unparsedText`.
     const replacer = (text) => text
         .replace(/{{char}}/g, characterName)
         .replace(/<<USER_INFO>>/g, userInfo)
