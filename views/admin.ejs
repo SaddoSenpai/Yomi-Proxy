@@ -23,6 +23,8 @@
             <li><a href="#" class="nav-link" data-tab="tokens"><i class='bx bx-key'></i><span class="link_name">User Tokens</span></a></li>
             <li><a href="#" class="nav-link" data-tab="custom-providers"><i class='bx bx-extension'></i><span class="link_name">Custom Providers</span></a></li>
             <li><a href="#" class="nav-link" data-tab="logs"><i class='bx bx-history'></i><span class="link_name">Logs</span></a></li>
+            <!-- NEW: Announce Tab Link -->
+            <li><a href="#" class="nav-link" data-tab="announce"><i class='bx bxs-megaphone'></i><span class="link_name">Announce</span></a></li>
             <li><a href="#" class="nav-link" data-tab="import-export"><i class='bx bx-transfer-alt'></i><span class="link_name">Import/Export</span></a></li>
             <li class="logout-link"><a href="/admin/logout"><i class='bx bx-log-out'></i><span class="link_name">Logout</span></a></li>
         </ul>
@@ -213,7 +215,7 @@
                             <input id="provider_display_name" placeholder="e.g., My Llama Provider" required>
                             
                             <label for="provider_id_input">Provider ID (for URL, no spaces/special chars)</label>
-                            <input id="provider_id_input" placeholder="e.g., my-llama-provider" required pattern="[a-z0-9-]+" title="Only lowercase letters, numbers, and hyphens are allowed.">
+                            <input id="provider_id_input" placeholder="e.g., my-llama-provider" required pattern="[a-z0-९-]+" title="Only lowercase letters, numbers, and hyphens are allowed.">
                             
                             <label for="provider_api_base_url">API Base URL (without /v1/chat/completions or /v1/messages)</label>
                             <input id="provider_api_base_url" type="url" placeholder="https://api.example.com" required>
@@ -297,6 +299,30 @@
                     <h3>Stored Logs</h3>
                     <div id="logsTable" class="logs-table"></div>
                     <div id="logsPagination" class="pagination"></div>
+                </div>
+            </div>
+
+            <!-- NEW: Announce Tab -->
+            <div id="announce" class="tab-content">
+                <div class="content-header">
+                    <h2>Global Announcement</h2>
+                </div>
+                <p class="muted">Create a site-wide announcement banner that will be shown to all users on the main page.</p>
+                <div class="io-card">
+                    <form id="announcement-form">
+                        <label for="announce_message">Announcement Message (supports basic HTML)</label>
+                        <textarea id="announce_message" rows="5" placeholder="e.g., Scheduled maintenance on Sunday at 2 AM UTC."></textarea>
+                        
+                        <label for="announce_enabled">Status</label>
+                        <select id="announce_enabled">
+                            <option value="false">Disabled</option>
+                            <option value="true">Enabled</option>
+                        </select>
+
+                        <div class="action-buttons">
+                            <button type="submit" class="btn-primary">Save Announcement</button>
+                        </div>
+                    </form>
                 </div>
             </div>
 

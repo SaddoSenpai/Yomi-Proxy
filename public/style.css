@@ -21,6 +21,36 @@ body {
     padding: 2rem;
 }
 
+/* --- NEW: Announcement Banner Styles --- */
+.announcement-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background-color: var(--blue);
+    color: white;
+    padding: 10px 40px 10px 20px;
+    box-sizing: border-box;
+    text-align: center;
+    z-index: 1001;
+    display: none; /* Hidden by default, shown by JS */
+    font-size: 0.9em;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+.announcement-banner p {
+    margin: 0;
+}
+.announcement-close {
+    position: absolute;
+    top: 50%;
+    right: 15px;
+    transform: translateY(-50%);
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+}
+
 .container {
     max-width: 800px;
     margin: 0 auto;
@@ -34,7 +64,6 @@ h1, h2, h3 {
     margin-top: 0;
 }
 
-/* Main Page Styles */
 .provider-card {
     background-color: var(--bg-card);
     border: 1px solid var(--border-color);
@@ -115,7 +144,6 @@ h1, h2, h3 {
 .key-status.over-quota { background-color: var(--orange); color: var(--bg-dark); }
 .key-status.revoked { background-color: var(--red); color: white; }
 
-/* Info Grid for Security & Logging */
 .info-grid {
     display: grid;
     grid-template-columns: 1fr;
@@ -129,7 +157,6 @@ h1, h2, h3 {
     }
 }
 
-/* Security & Logging Info Styles */
 .security-info {
     background-color: var(--bg-card);
     padding: 1rem;
@@ -147,12 +174,10 @@ h1, h2, h3 {
 .security-info .status-token { background-color: var(--blue); }
 .security-info .status-unknown { background-color: var(--red); }
 
-/* Logging Status Colors */
 .security-info .status-logging-enabled { background-color: var(--orange); color: var(--bg-dark); }
 .security-info .status-logging-purge { background-color: var(--purple); }
 .security-info .status-logging-disabled { background-color: var(--green); }
 
-/* --- User Guide Styles --- */
 .user-guide {
     background-color: var(--bg-card);
     border: 1px solid var(--border-color);
@@ -207,7 +232,6 @@ h1, h2, h3 {
     background-color: #5a7bff;
 }
 
-/* --- Commands Page Styles --- */
 .back-link {
     display: inline-block;
     margin: 1.5rem 0;
@@ -230,7 +254,6 @@ h1, h2, h3 {
     font-size: 1.2em;
 }
 
-/* Login Page Styles (for /admin) */
 .login-container {
     max-width: 400px;
     text-align: center;

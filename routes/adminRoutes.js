@@ -6,46 +6,58 @@ const router = express.Router();
 const adminController = require('../controllers/adminController');
 const { adminAuth } = require('../middleware/adminAuth');
 
-// --- Admin Pages ---
+// --- Admin Pages (Publicly accessible parts of the admin area) ---
 router.get('/', adminController.renderLoginPage);
 router.post('/login', adminController.handleLogin);
-router.get('/dashboard', adminAuth, adminController.renderDashboard);
 router.get('/logout', adminController.handleLogout);
 
-// --- Admin API Endpoints (protected by adminAuth middleware) ---
-router.get('/api/stats', adminAuth, adminController.getStats);
-router.get('/api/server-time', adminAuth, adminController.getServerTime); // <-- NEW ROUTE
+// --- Protected Admin Page ---
+// This route now also uses the same middleware for consistency.
+router.get('/dashboard', adminAuth, adminController.renderDashboard);
+
+// --- API ROUTE PROTECTION ---
+// MODIFIED: Apply the adminAuth middleware to ALL routes that start with /api
+// This is more robust than applying it to each route individually.
+router.use('/api', adminAuth);
+
+// --- Admin API Endpoints (Now automatically protected by the line above) ---
+router.get('/api/stats', adminController.getStats);
+router.get('/api/server-time', adminController.getServerTime);
 
 // Structure
-router.get('/api/structure', adminAuth, adminController.getStructure);
-router.put('/api/structure', adminAuth, adminController.updateStructure);
+router.get('/api/structure', adminController.getStructure);
+router.put('/api/structure', adminController.updateStructure);
 
 // Commands
-router.get('/api/commands', adminAuth, adminController.getCommands);
-router.post('/api/commands', adminAuth, adminController.saveCommand);
-router.delete('/api/commands/:id', adminAuth, adminController.deleteCommand);
+router.get('/api/commands', adminController.getCommands);
+router.post('/api/commands', adminController.saveCommand);
+router.delete('/api/commands/:id', adminController.deleteCommand);
 
 // User Tokens
-router.get('/api/tokens', adminAuth, adminController.getTokens);
-router.post('/api/tokens', adminAuth, adminController.saveToken);
-router.delete('/api/tokens/:id', adminAuth, adminController.deleteToken);
+router.get('/api/tokens', adminController.getTokens);
+router.post('/api/tokens', adminController.saveToken);
+router.delete('/api/tokens/:id', adminController.deleteToken);
 
 // Custom Providers
-router.get('/api/custom-providers', adminAuth, adminController.getCustomProviders);
-router.post('/api/custom-providers', adminAuth, adminController.saveCustomProvider);
-router.delete('/api/custom-providers/:id', adminAuth, adminController.deleteCustomProvider);
+router.get('/api/custom-providers', adminController.getCustomProviders);
+router.post('/api/custom-providers', adminController.saveCustomProvider);
+router.delete('/api/custom-providers/:id', adminController.deleteCustomProvider);
 
 // Logs
-router.get('/api/logs', adminAuth, adminController.getLogs);
-router.get('/api/logs/:id', adminAuth, adminController.getLogDetails);
-router.delete('/api/logs/:id', adminAuth, adminController.deleteLog);
-router.delete('/api/logs', adminAuth, adminController.deleteAllLogs);
-router.get('/api/logging-settings', adminAuth, adminController.getLogSettings);
-router.put('/api/logging-settings', adminAuth, adminController.updateLogSettings);
+router.get('/api/logs', adminController.getLogs);
+router.get('/api/logs/:id', adminController.getLogDetails);
+router.delete('/api/logs/:id', adminController.deleteLog);
+router.delete('/api/logs', adminController.deleteAllLogs);
+router.get('/api/logging-settings', adminController.getLogSettings);
+router.put('/api/logging-settings', adminController.updateLogSettings);
+
+// Announcement
+router.get('/api/announcement', adminController.getAnnouncement);
+router.put('/api/announcement', adminController.updateAnnouncement);
 
 // Import/Export
-router.post('/api/import', adminAuth, adminController.importData);
-router.get('/api/export', adminAuth, adminController.exportData);
+router.post('/api/import', adminController.importData);
+router.get('/api/export', adminController.exportData);
 
 
 module.exports = router;

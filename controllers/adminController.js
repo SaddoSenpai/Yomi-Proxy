@@ -34,11 +34,48 @@ exports.handleLogout = (req, res) => {
 
 // --- API: Stats ---
 exports.getStats = (req, res) => res.json(statsService.getStats());
-
-// --- NEW API: Server Time ---
 exports.getServerTime = (req, res) => {
-    // Respond with the current server time in a standard ISO format (UTC)
     res.json({ serverTime: new Date().toISOString() });
+};
+
+// --- API: Announcement ---
+exports.getAnnouncement = async (req, res) => {
+    // --- ADDED: Logging ---
+    console.log('[adminController] Reached getAnnouncement function successfully.');
+    try {
+        const result = await pool.query("SELECT key, value FROM app_config WHERE key IN ('announcement_message', 'announcement_enabled')");
+        const announcement = result.rows.reduce((acc, row) => {
+            acc[row.key] = row.value;
+            return acc;
+        }, {});
+        res.json({
+            message: announcement.announcement_message || '',
+            enabled: announcement.announcement_enabled === 'true'
+        });
+    } catch (error) {
+        console.error('[adminController] Error fetching announcement:', error);
+        res.status(500).json({ error: 'Failed to fetch announcement.' });
+    }
+};
+
+exports.updateAnnouncement = async (req, res) => {
+    // --- ADDED: Logging ---
+    console.log('[adminController] Reached updateAnnouncement function successfully.');
+    const { message, enabled } = req.body;
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        await client.query("UPDATE app_config SET value = $1 WHERE key = 'announcement_message'", [message]);
+        await client.query("UPDATE app_config SET value = $1 WHERE key = 'announcement_enabled'", [enabled]);
+        await client.query('COMMIT');
+        res.json({ success: true, message: 'Announcement updated successfully.' });
+    } catch (error) {
+        console.error('[adminController] Error updating announcement:', error);
+        await client.query('ROLLBACK');
+        res.status(500).json({ error: 'Failed to update announcement.' });
+    } finally {
+        client.release();
+    }
 };
 
 // --- API: Structure ---
@@ -77,7 +114,7 @@ exports.saveCommand = async (req, res) => {
         await promptService.saveCommand(req.body);
         res.json({ success: true });
     } catch (error) {
-        res.status(500).json({ error: 'Failed to save command.' });
+        res.status(500).json({ error: 'Failed to save command.', detail: error.message });
     }
 };
 exports.deleteCommand = async (req, res) => {

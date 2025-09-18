@@ -91,8 +91,8 @@ document.addEventListener('DOMContentLoaded', () => {
             serverClockInterval = setInterval(() => {
                 serverNow.setSeconds(serverNow.getSeconds() + 1);
                 
-                const datePart = serverNow.toLocaleDateString('en-CA', { timeZone: 'UTC' }); // YYYY-MM-DD
-                const timePart = serverNow.toLocaleTimeString('en-US', { timeZone: 'UTC', hour12: false }); // HH:MM:SS
+                const datePart = serverNow.toLocaleDateString('en-CA', { timeZone: 'UTC' });
+                const timePart = serverNow.toLocaleTimeString('en-US', { timeZone: 'UTC', hour12: false });
 
                 timeElement.innerHTML = `${datePart}<br>${timePart}`;
             }, 1000);
@@ -103,7 +103,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // Initial calls
     fetchStats();
     startServerClock();
     setInterval(fetchStats, 5000);
@@ -779,7 +778,44 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchLogs(1);
         fetchLogSettings();
     });
+    
+    // --- NEW: Announcement Tab Logic ---
+    const announcementForm = document.getElementById('announcement-form');
 
+    async function fetchAnnouncement() {
+        try {
+            const data = await api('/announcement');
+            document.getElementById('announce_message').value = data.message;
+            document.getElementById('announce_enabled').value = data.enabled;
+        } catch (error) {
+            showAlert('Failed to fetch announcement settings: ' + error.message, true);
+        }
+    }
+
+    const announceTabLink = document.querySelector('a[data-tab="announce"]');
+    announceTabLink.addEventListener('click', () => {
+        fetchAnnouncement();
+    });
+
+    announcementForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const body = {
+            message: document.getElementById('announce_message').value,
+            enabled: document.getElementById('announce_enabled').value === 'true'
+        };
+        try {
+            await api('/announcement', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            showAlert('Announcement saved successfully!');
+        } catch (error) {
+            showAlert('Failed to save announcement: ' + error.message, true);
+        }
+    });
+
+    // --- Import/Export ---
     document.getElementById('exportBtn').onclick = () => {
         const provider = document.getElementById('exportProviderSelector').value;
         window.location.href = `/admin/api/export?provider=${provider}`;
