@@ -27,6 +27,8 @@ router.get('/api/server-time', adminController.getServerTime);
 // Structure
 router.get('/api/structure', adminController.getStructure);
 router.put('/api/structure', adminController.updateStructure);
+router.get('/api/summarizer-structure', adminController.getSummarizerStructure);
+router.put('/api/summarizer-structure', adminController.updateSummarizerStructure);
 
 // Commands
 router.get('/api/commands', adminController.getCommands);

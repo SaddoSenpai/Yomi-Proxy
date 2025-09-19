@@ -100,6 +100,32 @@ exports.updateStructure = async (req, res) => {
     }
 };
 
+// --- API: Summarizer Structure ---
+exports.getSummarizerStructure = async (req, res) => {
+    try {
+        const provider = req.query.provider || 'default';
+        const structure = await promptService.getSummarizerStructure(provider);
+        res.json({ blocks: structure });
+    } catch (error) {
+        console.error('Failed to fetch summarizer structure:', error);
+        res.status(500).json({ error: 'Failed to fetch summarizer structure.' });
+    }
+};
+
+exports.updateSummarizerStructure = async (req, res) => {
+    try {
+        const provider = req.query.provider || 'default';
+        const { blocks } = req.body;
+        if (!Array.isArray(blocks)) return res.status(400).json({ error: 'blocks array is required' });
+        await promptService.setSummarizerStructure(provider, blocks);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Failed to update summarizer structure:', error);
+        res.status(500).json({ error: 'Failed to update summarizer structure.' });
+    }
+};
+
+
 // --- API: Commands ---
 exports.getCommands = async (req, res) => {
     try {

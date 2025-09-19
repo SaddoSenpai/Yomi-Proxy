@@ -7,6 +7,7 @@ const keyManager = require('../services/keyManager');
 const statsService = require('../services/statsService');
 const promptService = require('../services/promptService');
 const logService = require('../services/logService');
+const { filterThinkTags, ThinkTagStreamProcessor } = require('../services/thinkFilter');
 
 /**
  * --- REWRITTEN & CORRECTED ---
@@ -56,6 +57,8 @@ function formatFinalMessagesForClaude(finalMessages) {
 
 function claudeToOpenAIResponse(claudeResponse, providerConfig) {
     const content = claudeResponse.content?.[0]?.text || '';
+    const filteredContent = filterThinkTags(content); // <-- Filter <think> tags
+
     return {
         id: claudeResponse.id,
         object: 'chat.completion',
@@ -63,7 +66,7 @@ function claudeToOpenAIResponse(claudeResponse, providerConfig) {
         model: providerConfig.modelId,
         choices: [{
             index: 0,
-            message: { role: 'assistant', content: content },
+            message: { role: 'assistant', content: filteredContent }, // <-- Use filtered content
             finish_reason: claudeResponse.stop_reason,
         }],
         usage: {
@@ -74,13 +77,18 @@ function claudeToOpenAIResponse(claudeResponse, providerConfig) {
     };
 }
 
-function claudeStreamChunkToOpenAI(claudeChunk, providerConfig) {
+function claudeStreamChunkToOpenAI(claudeChunk, providerConfig, streamProcessor) {
     let choices = [];
     let finish_reason = null;
     switch (claudeChunk.type) {
         case 'content_block_delta':
             if (claudeChunk.delta?.type === 'text_delta') {
-                choices.push({ index: 0, delta: { content: claudeChunk.delta.text }, finish_reason: null });
+                // Process the text through the stateful filter
+                const filteredText = streamProcessor.process(claudeChunk.delta.text);
+                // Only create a choice if there's content left after filtering
+                if (filteredText) {
+                    choices.push({ index: 0, delta: { content: filteredText }, finish_reason: null });
+                }
             }
             break;
         case 'message_delta':
@@ -124,10 +132,23 @@ exports.proxyRequest = async (req, res, provider) => {
     const providerConfig = keyManager.getProviderConfig(provider);
 
     try {
-        const { finalMessages, characterName, commandTags } = await promptService.buildFinalMessages(provider, originalBody.messages, reqId);
-        const finalBody = { ...originalBody, messages: finalMessages };
+        const { requestType, triggerMessage } = promptService.detectRequestType(originalBody.messages);
 
-        // Create the initial log entry
+        let finalMessages, characterName, commandTags, finalBody;
+
+        if (requestType === 'summarize') {
+            console.log(`[${reqId}] Detected Summarization Request.`);
+            characterName = 'Summary';
+            commandTags = ['SUMMARY']; 
+            
+            ({ finalMessages } = await promptService.buildSummarizerMessages(provider, originalBody.messages, triggerMessage, reqId));
+            finalBody = { ...originalBody, messages: finalMessages };
+        
+        } else { // It's a regular chat request
+            ({ finalMessages, characterName, commandTags } = await promptService.buildFinalMessages(provider, originalBody.messages, reqId));
+            finalBody = { ...originalBody, messages: finalMessages };
+        }
+        
         const detectedCommands = commandTags.length > 0 ? commandTags.join(', ') : 'None';
         await logService.createLogEntry(reqId, provider, tokenName, finalBody, characterName, detectedCommands);
 
@@ -136,6 +157,7 @@ exports.proxyRequest = async (req, res, provider) => {
         } else {
             await handleOpenAICompatibleRequest(reqId, res, finalBody, apiKey, provider, providerConfig);
         }
+
     } catch (error) {
         await handleProxyError(reqId, res, error, provider, apiKey);
     }
@@ -186,21 +208,68 @@ async function handleOpenAICompatibleRequest(reqId, res, body, apiKey, provider,
 
     if (body.stream) {
         res.setHeader('Content-Type', 'text/event-stream');
-        providerResponse.data.pipe(res);
-        // For streams, we log success but cannot capture the full response payload easily.
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        
+        // Create a new stream processor for each request
+        const streamProcessor = new ThinkTagStreamProcessor();
+
+        providerResponse.data.on('data', chunk => {
+            const chunkStr = chunk.toString();
+            // OpenAI-like streams send multiple events in one chunk, separated by newlines
+            const eventLines = chunkStr.split('\n').filter(line => line.startsWith('data: '));
+
+            for (const line of eventLines) {
+                const jsonStr = line.substring(6).trim();
+                if (jsonStr === '[DONE]') {
+                    res.write('data: [DONE]\n\n');
+                    continue;
+                }
+
+                try {
+                    const parsed = JSON.parse(jsonStr);
+                    const content = parsed.choices?.[0]?.delta?.content;
+
+                    if (content) {
+                        const filteredContent = streamProcessor.process(content);
+                        if (filteredContent) {
+                            // Re-assemble the chunk with the filtered content
+                            const newChunk = { ...parsed };
+                            newChunk.choices[0].delta.content = filteredContent;
+                            res.write(`data: ${JSON.stringify(newChunk)}\n\n`);
+                        }
+                    } else {
+                        // Pass through chunks that don't have content (e.g., finish_reason)
+                        res.write(`data: ${jsonStr}\n\n`);
+                    }
+                } catch (e) {
+                    // In case of malformed JSON, just pass the original line
+                    console.warn(`[${reqId}] Could not parse stream chunk, passing through. Chunk: ${jsonStr}`);
+                    res.write(`${line}\n\n`);
+                }
+            }
+        });
+
         providerResponse.data.on('end', () => {
             logService.updateLogEntry(reqId, 200, { stream: true, status: 'completed' });
+            res.end();
         });
+
     } else {
         let responseData = providerResponse.data;
         if (provider === 'gemini') {
             const responseText = responseData.candidates?.[0]?.content?.parts?.[0]?.text || '';
             responseData = { choices: [{ message: { role: 'assistant', content: responseText } }], usage: { prompt_tokens: 0, completion_tokens: 0 } };
         }
+        
+        // Filter <think> tags from the final non-streamed response
+        if (responseData.choices?.[0]?.message?.content) {
+            responseData.choices[0].message.content = filterThinkTags(responseData.choices[0].message.content);
+        }
+
         let usage = responseData.usage || { prompt_tokens: 0, completion_tokens: 0 };
         statsService.addTokens(usage.prompt_tokens, usage.completion_tokens);
         
-        // Log the successful response
         await logService.updateLogEntry(reqId, providerResponse.status, responseData);
 
         res.status(providerResponse.status).json(responseData);
@@ -211,7 +280,6 @@ async function handleOpenAICompatibleRequest(reqId, res, body, apiKey, provider,
 async function handleClaudeRequest(reqId, res, body, apiKey, providerConfig) {
     const forwardUrl = `${providerConfig.apiBaseUrl}/v1/messages`;
     
-    // 1. Format the final, ordered messages from promptService into the correct Claude block structure.
     const { system, messages } = formatFinalMessagesForClaude(body.messages);
 
     if (messages.length === 0 && !system) {
@@ -219,13 +287,11 @@ async function handleClaudeRequest(reqId, res, body, apiKey, providerConfig) {
         return res.status(400).json({ error: "Invalid request: No valid messages or system prompt to send after processing." });
     }
 
-    // 2. Build the final request body using the correctly structured data.
     const forwardBody = {
         model: providerConfig.modelId,
         messages: messages,
         max_tokens: body.max_tokens || 4096,
         stream: body.stream || false,
-        // Pass through other common parameters
         temperature: body.temperature,
         top_p: body.top_p,
         top_k: body.top_k,
@@ -250,6 +316,10 @@ async function handleClaudeRequest(reqId, res, body, apiKey, providerConfig) {
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
+
+        // Create a new stream processor for each request
+        const streamProcessor = new ThinkTagStreamProcessor();
+
         providerResponse.data.on('data', chunk => {
             const lines = chunk.toString().split('\n').filter(line => line.trim() !== '');
             for (const line of lines) {
@@ -257,7 +327,8 @@ async function handleClaudeRequest(reqId, res, body, apiKey, providerConfig) {
                     try {
                         const dataStr = line.substring(6);
                         const claudeChunk = JSON.parse(dataStr);
-                        const openaiChunk = claudeStreamChunkToOpenAI(claudeChunk, providerConfig);
+                        // Pass the processor to the converter function
+                        const openaiChunk = claudeStreamChunkToOpenAI(claudeChunk, providerConfig, streamProcessor);
                         if (openaiChunk) res.write(`data: ${JSON.stringify(openaiChunk)}\n\n`);
                     } catch (error) {
                         console.error(`[${reqId}] Error parsing Claude stream chunk:`, error);
@@ -268,14 +339,12 @@ async function handleClaudeRequest(reqId, res, body, apiKey, providerConfig) {
         providerResponse.data.on('end', () => {
             res.write('data: [DONE]\n\n');
             res.end();
-            // Log stream completion
             logService.updateLogEntry(reqId, 200, { stream: true, status: 'completed' });
         });
     } else {
         const responseData = claudeToOpenAIResponse(providerResponse.data, providerConfig);
         statsService.addTokens(responseData.usage.prompt_tokens, responseData.usage.completion_tokens);
         
-        // Log the successful response
         await logService.updateLogEntry(reqId, 200, responseData);
 
         res.status(200).json(responseData);
@@ -314,7 +383,6 @@ async function handleProxyError(reqId, res, error, provider, apiKey) {
             errorData = { error: 'An internal proxy error occurred with no response from the provider.' };
         }
         
-        // Log the error response
         await logService.updateLogEntry(reqId, status || 500, errorData);
 
         res.status(status || 500).json(errorData);

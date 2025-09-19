@@ -96,7 +96,15 @@ async function startServer() {
     await tokenManager.initialize();
     await keyManager.initialize();
     await logService.initialize(); // <-- 2. INITIALIZE THE LOGGER
-    await keyManager.checkAllKeys();
+        // Conditionally check keys based on the STATE environment variable.
+    // This skips the expensive and potentially failing key validation during startup
+    // when running in a testing or development environment.
+    if (process.env.STATE !== 'TESTING') {
+        console.log('[Startup] Running in PRODUCTION or default mode. Performing key validation...');
+        await keyManager.checkAllKeys();
+    } else {
+        console.warn('[Startup] STATE is "TESTING". Skipping startup key validation.');
+    }
 
     app.listen(PORT, () => {
         console.log(`\n[OK] Yomi Proxy is running on http://localhost:${PORT}`);

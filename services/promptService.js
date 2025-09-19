@@ -255,6 +255,116 @@ async function deleteCommand(id) {
     await pool.query('DELETE FROM commands WHERE id = $1', [id]);
 }
 
+
+// --- NEW: Functions for Summarizer ---
+
+const SUMMARIZER_TRIGGER_REGEX = /Create a brief, focused summary/i;
+
+/**
+ * Detects if a request is a standard chat or a special summarization request.
+ * @param {Array<object>} messages - The incoming messages from the client.
+ * @returns {{requestType: 'chat'|'summarize', triggerMessage: object|null}}
+ */
+function detectRequestType(messages) {
+    if (!messages || messages.length === 0) {
+        return { requestType: 'chat', triggerMessage: null };
+    }
+
+    // A summarizer request is typically the last message from the user
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage && lastMessage.role === 'user' && SUMMARIZER_TRIGGER_REGEX.test(lastMessage.content)) {
+        return { requestType: 'summarize', triggerMessage: lastMessage };
+    }
+    
+    return { requestType: 'chat', triggerMessage: null };
+}
+
+/**
+ * Fetches the summarizer structure for a given provider.
+ * @param {string} provider - The provider ID.
+ * @returns {Promise<Array<object>>} The structure blocks.
+ */
+async function getSummarizerStructure(provider) {
+    const res = await pool.query('SELECT * FROM summarizer_prompt_blocks WHERE provider = $1 ORDER BY position', [provider]);
+    return res.rows;
+}
+
+/**
+ * Saves the summarizer structure for a given provider.
+ * @param {string} provider - The provider ID.
+ * @param {Array<object>} blocks - The array of structure blocks.
+ */
+async function setSummarizerStructure(provider, blocks) {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        await client.query('DELETE FROM summarizer_prompt_blocks WHERE provider = $1', [provider]);
+        for (let i = 0; i < blocks.length; i++) {
+            const block = blocks[i];
+            await client.query(
+                'INSERT INTO summarizer_prompt_blocks (provider, name, role, content, position, is_enabled) VALUES ($1, $2, $3, $4, $5, $6)',
+                [provider, block.name, block.role, block.content, i, block.is_enabled]
+            );
+        }
+        await client.query('COMMIT');
+    } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+    } finally {
+        client.release();
+    }
+}
+
+
+/**
+ * Builds the final message payload for a summarization request.
+ * @param {string} provider - The target provider.
+ * @param {Array<object>} incomingMessages - The full chat history including the trigger.
+ * @param {object} triggerMessage - The user message that initiated the summary.
+ * @param {string} reqId - The request ID for logging.
+ * @returns {Promise<{finalMessages: Array<object>}>}
+ */
+async function buildSummarizerMessages(provider, incomingMessages, triggerMessage, reqId) {
+    // 1. Get the custom summary instructions from the <summary> tag
+    const summaryRegex = /<summary>([\s\S]*?)<\/summary>/;
+    const summaryMatch = triggerMessage.content.match(summaryRegex);
+    const summaryInfo = summaryMatch ? summaryMatch[1].trim() : '';
+
+    // 2. The chat history is all messages *except* the trigger message
+    const chatHistoryToSummarize = incomingMessages.filter(msg => msg !== triggerMessage);
+    const formattedHistory = chatHistoryToSummarize
+        .map(msg => `${msg.role.charAt(0).toUpperCase() + msg.role.slice(1)}: ${msg.content}`)
+        .join('\n');
+
+    // 3. Get the summarizer structure from the DB
+    let structureToUse = await getSummarizerStructure(provider);
+    if (structureToUse.length === 0 && provider !== 'default') {
+        console.log(`[${reqId}] No summarizer structure for '${provider}', falling back to 'default'.`);
+        structureToUse = await getSummarizerStructure('default');
+    }
+
+    if (structureToUse.length === 0) {
+        throw new Error('No default summarizer structure is configured. Please set one up in the admin panel.');
+    }
+    
+    // 4. Build the final messages using the structure
+    const finalMessages = [];
+    for (const block of structureToUse) {
+        if (!block.content) continue;
+        
+        const content = block.content
+            .replace(/<<SUMMARY>>/g, summaryInfo)
+            .replace(/<<CHAT_HISTORY>>/g, formattedHistory);
+
+        if (content.trim()) {
+            finalMessages.push({ role: block.role, content });
+        }
+    }
+    
+    console.log(`[${reqId}] Summarizer prompt construction complete. Final message count: ${finalMessages.length}`);
+    return { finalMessages };
+}
+
 module.exports = {
     buildFinalMessages,
     getStructure,
@@ -262,5 +372,10 @@ module.exports = {
     getCommands,
     saveCommand,
     deleteCommand,
-    UserInputError
+    UserInputError,
+    // --- NEWLY EXPORTED ---
+    detectRequestType,
+    buildSummarizerMessages,
+    getSummarizerStructure,
+    setSummarizerStructure
 };

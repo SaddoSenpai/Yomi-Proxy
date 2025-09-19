@@ -235,7 +235,9 @@ async function checkAllKeys() {
 }
 
 /**
+ * --- MODIFIED FOR TESTING STATE ---
  * Gets the next available active key for a provider using round-robin.
+ * If STATE is 'TESTING', it will also treat 'unchecked' keys as 'active'.
  * @param {string} provider - The name of the provider.
  * @returns {object|null} The key object or null if no active keys are available.
  */
@@ -243,15 +245,27 @@ function getRotatingKey(provider) {
     const providerData = state.providers[provider];
     if (!providerData || providerData.keys.length === 0) return null;
 
+    const isTesting = process.env.STATE === 'TESTING';
     const totalKeys = providerData.keys.length;
+
     for (let i = 0; i < totalKeys; i++) {
         const keyIndex = (providerData.currentIndex + i) % totalKeys;
         const key = providerData.keys[keyIndex];
-        if (key.status === 'active') {
+
+        // A key is usable if its status is 'active', OR if we are in testing mode
+        // and the key's status is 'unchecked'.
+        const isUsable = key.status === 'active' || (isTesting && key.status === 'unchecked');
+
+        if (isUsable) {
             providerData.currentIndex = (keyIndex + 1) % totalKeys;
             return key;
         }
     }
+
+    if (isTesting) {
+        console.warn(`[Key Manager] No usable keys for ${provider} in TESTING mode. All keys are either over_quota or revoked.`);
+    }
+
     return null; // No active keys found
 }
 
@@ -304,20 +318,37 @@ function getAvailableProviders() {
 }
 
 /**
+ * --- MODIFIED FOR TESTING STATE ---
  * Returns statistics for the main page display.
+ * If STATE is 'TESTING', it will count 'unchecked' keys as 'active'.
  * @returns {object} An object containing provider stats.
  */
 function getProviderStats() {
+    const isTesting = process.env.STATE === 'TESTING';
     const stats = {};
+
     for (const providerName in state.providers) {
         const providerData = state.providers[providerName];
+        
+        let activeKeysCount, revokedKeysCount;
+
+        if (isTesting) {
+            // In testing mode, 'unchecked' keys are counted as 'active' for the UI.
+            activeKeysCount = providerData.keys.filter(k => k.status === 'active' || k.status === 'unchecked').length;
+            revokedKeysCount = providerData.keys.filter(k => k.status === 'revoked').length;
+        } else {
+            // In production (or default) mode, the original logic applies.
+            activeKeysCount = providerData.keys.filter(k => k.status === 'active').length;
+            revokedKeysCount = providerData.keys.filter(k => k.status === 'revoked' || k.status === 'unchecked').length;
+        }
+
         stats[providerName] = {
             ...providerData.config,
             name: providerName,
             keys: {
-                active: providerData.keys.filter(k => k.status === 'active').length,
+                active: activeKeysCount,
                 over_quota: providerData.keys.filter(k => k.status === 'over_quota').length,
-                revoked: providerData.keys.filter(k => k.status === 'revoked' || k.status === 'unchecked').length,
+                revoked: revokedKeysCount,
             }
         };
     }

@@ -844,4 +844,138 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Import failed: ' + error.message);
         }
     };
+
+    // --- Summarizer Structure Editor ---
+    const summarizerProviderSelector = document.getElementById('summarizerProviderSelector');
+    const summarizerBlocksList = document.getElementById('summarizerBlocksList');
+    let currentSummarizerBlocks = [];
+    let pristineSummarizerBlocks = '[]';
+    let currentlyEditingSummarizerIndex = -1;
+
+    function updateSummarizerSaveButtonState() {
+        const saveBtn = document.getElementById('saveSummarizerStructureBtn');
+        const hasChanges = JSON.stringify(currentSummarizerBlocks) !== pristineSummarizerBlocks;
+        saveBtn.disabled = !hasChanges;
+    }
+
+    async function fetchSummarizerStructure(provider) {
+        try {
+            currentlyEditingSummarizerIndex = -1;
+            const data = await api(`/summarizer-structure?provider=${provider}`);
+            currentSummarizerBlocks = data.blocks || [];
+            pristineSummarizerBlocks = JSON.stringify(currentSummarizerBlocks);
+            renderSummarizerBlocks();
+            updateSummarizerSaveButtonState();
+        } catch (error) {
+            alert('Error fetching summarizer structure: ' + error.message);
+        }
+    }
+
+    function renderSummarizerBlocks() {
+        summarizerBlocksList.innerHTML = '';
+        currentSummarizerBlocks.forEach((block, index) => {
+            const isEditing = index === currentlyEditingSummarizerIndex;
+            const el = document.createElement('div');
+            el.className = `block-item ${isEditing ? 'is-editing' : ''}`;
+            el.innerHTML = `
+                <div class="block-header">
+                    <div class="block-info">
+                        <span class="block-name">${block.name || 'Unnamed Block'}</span>
+                        <span class="block-role">(${block.role})</span>
+                    </div>
+                    <div class="block-actions">
+                        <div class="move-controls">
+                            <button class="btn-secondary btn-move" onclick="moveSummarizerBlock(${index}, -1)" ${index === 0 ? 'disabled' : ''}>
+                                <i class='bx bx-up-arrow-alt'></i>
+                            </button>
+                            <button class="btn-secondary btn-move" onclick="moveSummarizerBlock(${index}, 1)" ${index === currentSummarizerBlocks.length - 1 ? 'disabled' : ''}>
+                                <i class='bx bx-down-arrow-alt'></i>
+                            </button>
+                        </div>
+                        <div class="edit-controls">
+                            <button class="btn-secondary" onclick="toggleSummarizerEdit(${index})">${isEditing ? 'Cancel' : 'Edit'}</button>
+                            <button class="btn-secondary" style="background-color: var(--red);" onclick="deleteSummarizerBlock(${index})">Delete</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="block-editor">
+                    <div class="block-editor-grid">
+                        <input class="edit-name" value="${block.name || ''}" placeholder="Block Name">
+                        <select class="edit-role">
+                            <option value="system" ${block.role === 'system' ? 'selected' : ''}>system</option>
+                            <option value="user" ${block.role === 'user' ? 'selected' : ''}>user</option>
+                            <option value="assistant" ${block.role === 'assistant' ? 'selected' : ''}>assistant</option>
+                        </select>
+                    </div>
+                    <textarea class="edit-content" placeholder="Block content...">${block.content || ''}</textarea>
+                    <div class="action-buttons">
+                        <button class="btn-primary" onclick="saveSummarizerBlockEdit(${index})">Save Changes</button>
+                    </div>
+                </div>
+            `;
+            summarizerBlocksList.appendChild(el);
+        });
+    }
+    
+    window.moveSummarizerBlock = (index, direction) => {
+        const newIndex = index + direction;
+        if (newIndex < 0 || newIndex >= currentSummarizerBlocks.length) return;
+        [currentSummarizerBlocks[index], currentSummarizerBlocks[newIndex]] = [currentSummarizerBlocks[newIndex], currentSummarizerBlocks[index]];
+        if(currentlyEditingSummarizerIndex === index) currentlyEditingSummarizerIndex = newIndex;
+        else if (currentlyEditingSummarizerIndex === newIndex) currentlyEditingSummarizerIndex = index;
+        renderSummarizerBlocks();
+        updateSummarizerSaveButtonState();
+    };
+
+    window.toggleSummarizerEdit = (index) => {
+        currentlyEditingSummarizerIndex = (currentlyEditingSummarizerIndex === index) ? -1 : index;
+        renderSummarizerBlocks();
+    };
+
+    window.deleteSummarizerBlock = (index) => {
+        if (!confirm('Are you sure you want to delete this block?')) return;
+        currentSummarizerBlocks.splice(index, 1);
+        currentlyEditingSummarizerIndex = -1;
+        renderSummarizerBlocks();
+        updateSummarizerSaveButtonState();
+    };
+
+    window.saveSummarizerBlockEdit = (index) => {
+        const blockItem = summarizerBlocksList.children[index];
+        currentSummarizerBlocks[index].name = blockItem.querySelector('.edit-name').value;
+        currentSummarizerBlocks[index].role = blockItem.querySelector('.edit-role').value;
+        currentSummarizerBlocks[index].content = blockItem.querySelector('.edit-content').value;
+        currentlyEditingSummarizerIndex = -1;
+        renderSummarizerBlocks();
+        updateSummarizerSaveButtonState();
+    };
+
+    document.getElementById('addSummarizerBlockBtn').onclick = () => {
+        currentSummarizerBlocks.push({ name: 'New Block', role: 'user', content: '', is_enabled: true });
+        currentlyEditingSummarizerIndex = currentSummarizerBlocks.length - 1;
+        renderSummarizerBlocks();
+        updateSummarizerSaveButtonState();
+    };
+
+    document.getElementById('saveSummarizerStructureBtn').onclick = async () => {
+        try {
+            await api(`/summarizer-structure?provider=${summarizerProviderSelector.value}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ blocks: currentSummarizerBlocks })
+            });
+            pristineSummarizerBlocks = JSON.stringify(currentSummarizerBlocks);
+            updateSummarizerSaveButtonState();
+            alert('Summarizer structure saved successfully!');
+        } catch (error) {
+            alert('Error saving summarizer structure: ' + error.message);
+        }
+    };
+
+    summarizerProviderSelector.onchange = () => fetchSummarizerStructure(summarizerProviderSelector.value);
+    
+    // Fetch summarizer structure when its tab is clicked
+    document.querySelector('a[data-tab="summarizer"]').addEventListener('click', () => {
+        fetchSummarizerStructure(summarizerProviderSelector.value);
+    });
 });

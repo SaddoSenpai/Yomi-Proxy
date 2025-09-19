@@ -19,6 +19,8 @@
         <ul class="nav-links">
             <li><a href="#" class="nav-link active" data-tab="dashboard"><i class='bx bx-grid-alt'></i><span class="link_name">Dashboard</span></a></li>
             <li><a href="#" class="nav-link" data-tab="structure"><i class='bx bx-list-ul'></i><span class="link_name">Structure</span></a></li>
+            <!-- NEW: Summarizer Tab Link -->
+            <li><a href="#" class="nav-link" data-tab="summarizer"><i class='bx bx-book-content'></i><span class="link_name">Summarizer</span></a></li>
             <li><a href="#" class="nav-link" data-tab="commands"><i class='bx bx-terminal'></i><span class="link_name">Commands</span></a></li>
             <li><a href="#" class="nav-link" data-tab="tokens"><i class='bx bx-key'></i><span class="link_name">User Tokens</span></a></li>
             <li><a href="#" class="nav-link" data-tab="custom-providers"><i class='bx bx-extension'></i><span class="link_name">Custom Providers</span></a></li>
@@ -80,6 +82,32 @@
                 <div class="action-buttons">
                     <button id="addBlockBtn" class="btn-secondary">Add Block</button>
                     <button id="saveStructureBtn" class="btn-primary">Save Structure</button>
+                </div>
+            </div>
+
+            <!-- NEW: Summarizer Tab -->
+            <div id="summarizer" class="tab-content">
+                <div class="content-header">
+                    <h2>Summarizer Prompt Structure</h2>
+                    <div class="controls">
+                        <label for="summarizerProviderSelector">Provider:</label>
+                        <select id="summarizerProviderSelector">
+                            <option value="default">Default (Fallback)</option>
+                            <% availableProviders.forEach(p => { %>
+                                <option value="<%= p %>"><%= p.charAt(0).toUpperCase() + p.slice(1) %></option>
+                            <% }) %>
+                        </select>
+                    </div>
+                </div>
+                <p class="muted">
+                    Define the prompt structure for summarization requests. 
+                    Use <code>&lt;&lt;CHAT_HISTORY&gt;&gt;</code> as a placeholder for the conversation transcript and 
+                    <code>&lt;&lt;SUMMARY&gt;&gt;</code> for user-provided instructions.
+                </p>
+                <div id="summarizerBlocksList"></div>
+                <div class="action-buttons">
+                    <button id="addSummarizerBlockBtn" class="btn-secondary">Add Block</button>
+                    <button id="saveSummarizerStructureBtn" class="btn-primary">Save Structure</button>
                 </div>
             </div>
 
