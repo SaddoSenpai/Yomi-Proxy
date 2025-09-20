@@ -19,12 +19,12 @@ const state = {
 async function initialize() {
     console.log('[Token Manager] Initializing...');
     try {
-        const result = await pool.query('SELECT id, name, token, rpm, is_enabled, expires_at FROM user_tokens');
+        const tokens = await pool('user_tokens').select('id', 'name', 'token', 'rpm', 'is_enabled', 'expires_at');
         state.tokens.clear();
         const now = new Date();
         const expiredTokenIds = [];
 
-        for (const tokenData of result.rows) {
+        for (const tokenData of tokens) {
             // Check if the token is active but has an expiration date that has passed
             if (tokenData.is_enabled && tokenData.expires_at && new Date(tokenData.expires_at) < now) {
                 console.warn(`[Token Manager] Token '${tokenData.name}' (ID: ${tokenData.id}) has expired. Marking as disabled.`);
@@ -36,7 +36,7 @@ async function initialize() {
 
         // If we found any expired tokens, update their status in the database
         if (expiredTokenIds.length > 0) {
-            await pool.query('UPDATE user_tokens SET is_enabled = false, updated_at = NOW() WHERE id = ANY($1)', [expiredTokenIds]);
+            await pool('user_tokens').whereIn('id', expiredTokenIds).update({ is_enabled: false, updated_at: pool.fn.now() });
             console.log(`[Token Manager] Successfully disabled ${expiredTokenIds.length} expired token(s) in the database.`);
         }
 
@@ -106,8 +106,7 @@ function cleanupRequestTimestamps() {
  * Returns all tokens for the admin panel.
  */
 async function getAdminTokens() {
-    const result = await pool.query('SELECT id, name, token, rpm, is_enabled, created_at, updated_at, expires_at FROM user_tokens ORDER BY name');
-    return result.rows;
+    return await pool('user_tokens').select('id', 'name', 'token', 'rpm', 'is_enabled', 'created_at', 'updated_at', 'expires_at').orderBy('name');
 }
 
 /**
@@ -125,15 +124,18 @@ async function saveToken(tokenData) {
     const expirationDate = expires_at ? expires_at : null;
 
     if (id && !regenerate) { // Update existing token
-        const existing = await pool.query('SELECT token FROM user_tokens WHERE id = $1', [id]);
-        if (existing.rows.length === 0) throw new Error('Token not found for update.');
-        tokenValue = existing.rows[0].token;
+        const existing = await pool('user_tokens').where('id', id).first();
+        if (!existing) throw new Error('Token not found for update.');
+        tokenValue = existing.token;
 
-        const result = await pool.query(
-            'UPDATE user_tokens SET name = $1, rpm = $2, is_enabled = $3, expires_at = $4, updated_at = NOW() WHERE id = $5 RETURNING *',
-            [name, rpm, is_enabled, expirationDate, id]
-        );
-        savedToken = result.rows[0];
+        const [updatedToken] = await pool('user_tokens').where('id', id).update({
+            name,
+            rpm,
+            is_enabled,
+            expires_at: expirationDate,
+            updated_at: pool.fn.now()
+        }).returning('*');
+        savedToken = updatedToken;
         // Update in-memory cache
         state.tokens.set(savedToken.token, savedToken);
 
@@ -141,22 +143,29 @@ async function saveToken(tokenData) {
         tokenValue = crypto.randomBytes(24).toString('hex');
         if (id && regenerate) { // Regenerate
             // Remove old token from cache
-            const oldTokenResult = await pool.query('SELECT token FROM user_tokens WHERE id = $1', [id]);
-            if (oldTokenResult.rows.length > 0) {
-                state.tokens.delete(oldTokenResult.rows[0].token);
+            const oldToken = await pool('user_tokens').where('id', id).first();
+            if (oldToken) {
+                state.tokens.delete(oldToken.token);
             }
 
-            const result = await pool.query(
-                'UPDATE user_tokens SET name = $1, rpm = $2, is_enabled = $3, token = $4, expires_at = $5, updated_at = NOW() WHERE id = $6 RETURNING *',
-                [name, rpm, is_enabled, tokenValue, expirationDate, id]
-            );
-            savedToken = result.rows[0];
+            const [updatedToken] = await pool('user_tokens').where('id', id).update({
+                name,
+                rpm,
+                is_enabled,
+                token: tokenValue,
+                expires_at: expirationDate,
+                updated_at: pool.fn.now()
+            }).returning('*');
+            savedToken = updatedToken;
         } else { // Create new
-            const result = await pool.query(
-                'INSERT INTO user_tokens (name, token, rpm, is_enabled, expires_at) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-                [name, tokenValue, rpm, is_enabled, expirationDate]
-            );
-            savedToken = result.rows[0];
+            const [newToken] = await pool('user_tokens').insert({
+                name,
+                token: tokenValue,
+                rpm,
+                is_enabled,
+                expires_at: expirationDate
+            }).returning('*');
+            savedToken = newToken;
         }
         // Add new token to cache
         state.tokens.set(savedToken.token, savedToken);
@@ -170,14 +179,13 @@ async function saveToken(tokenData) {
  */
 async function deleteToken(id) {
     // First, get the token value to remove it from the in-memory map
-    const result = await pool.query('SELECT token FROM user_tokens WHERE id = $1', [id]);
-    if (result.rows.length > 0) {
-        const tokenValue = result.rows[0].token;
-        state.tokens.delete(tokenValue);
-        state.requests.delete(tokenValue); // Also clear any rate limit data
+    const token = await pool('user_tokens').where('id', id).first();
+    if (token) {
+        state.tokens.delete(token.token);
+        state.requests.delete(token.token); // Also clear any rate limit data
     }
     // Then, delete from the database
-    await pool.query('DELETE FROM user_tokens WHERE id = $1', [id]);
+    await pool('user_tokens').where('id', id).del();
 }
 
 module.exports = {
