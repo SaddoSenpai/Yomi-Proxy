@@ -50,7 +50,7 @@ async function initialize() {
 
     // 2. Load custom providers from the database
     try {
-        const { rows } = await pool.query('SELECT * FROM custom_providers WHERE is_enabled = true');
+        const rows = await pool('custom_providers').where('is_enabled', true);
         for (const provider of rows) {
             const keys = (provider.api_keys || '').split(',').map(k => k.trim()).filter(Boolean);
             if (keys.length > 0) {

@@ -66,8 +66,7 @@ function parseCommandsFromMessages(messages) {
 
 async function getCommandDefinitions(commandTags) {
     if (commandTags.length === 0) return [];
-    const result = await pool.query('SELECT * FROM commands WHERE command_tag = ANY($1)', [commandTags]);
-    return result.rows;
+    return await pool('commands').whereIn('command_tag', commandTags);
 }
 
 async function buildFinalMessages(provider, incomingMessages, reqId) {
@@ -201,34 +200,30 @@ async function buildFinalMessages(provider, incomingMessages, reqId) {
 }
 
 async function getStructure(provider) {
-    const res = await pool.query('SELECT * FROM global_prompt_blocks WHERE provider = $1 ORDER BY position', [provider]);
-    return res.rows;
+    return await pool('global_prompt_blocks').where('provider', provider).orderBy('position');
 }
 
 async function setStructure(provider, blocks) {
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
-        await client.query('DELETE FROM global_prompt_blocks WHERE provider = $1', [provider]);
+    await pool.transaction(async trx => {
+        await trx('global_prompt_blocks').where('provider', provider).del();
         for (let i = 0; i < blocks.length; i++) {
             const block = blocks[i];
-            await client.query(
-                'INSERT INTO global_prompt_blocks (provider, name, role, content, position, is_enabled, block_type, replacement_command_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-                [provider, block.name, block.role, block.content, i, block.is_enabled, block.block_type, block.replacement_command_id || null]
-            );
+            await trx('global_prompt_blocks').insert({
+                provider,
+                name: block.name,
+                role: block.role,
+                content: block.content,
+                position: i,
+                is_enabled: block.is_enabled,
+                block_type: block.block_type,
+                replacement_command_id: block.replacement_command_id || null
+            });
         }
-        await client.query('COMMIT');
-    } catch (e) {
-        await client.query('ROLLBACK');
-        throw e;
-    } finally {
-        client.release();
-    }
+    });
 }
 
 async function getCommands() {
-    const res = await pool.query('SELECT * FROM commands ORDER BY command_tag');
-    return res.rows;
+    return await pool('commands').orderBy('command_tag');
 }
 
 async function saveCommand(commandData) {
@@ -239,20 +234,29 @@ async function saveCommand(commandData) {
     }
 
     if (id) {
-        await pool.query(
-            'UPDATE commands SET command_tag = $1, block_name = $2, block_role = $3, block_content = $4, command_type = $5, command_id = $6, updated_at = NOW() WHERE id = $7',
-            [command_tag.toUpperCase(), block_name, block_role, block_content, command_type, command_id, id]
-        );
+        await pool('commands').where('id', id).update({
+            command_tag: command_tag.toUpperCase(),
+            block_name,
+            block_role,
+            block_content,
+            command_type,
+            command_id,
+            updated_at: pool.fn.now()
+        });
     } else {
-        await pool.query(
-            'INSERT INTO commands (command_tag, block_name, block_role, block_content, command_type, command_id) VALUES ($1, $2, $3, $4, $5, $6)',
-            [command_tag.toUpperCase(), block_name, block_role, block_content, command_type, command_id]
-        );
+        await pool('commands').insert({
+            command_tag: command_tag.toUpperCase(),
+            block_name,
+            block_role,
+            block_content,
+            command_type,
+            command_id
+        });
     }
 }
 
 async function deleteCommand(id) {
-    await pool.query('DELETE FROM commands WHERE id = $1', [id]);
+    await pool('commands').where('id', id).del();
 }
 
 
@@ -285,8 +289,7 @@ function detectRequestType(messages) {
  * @returns {Promise<Array<object>>} The structure blocks.
  */
 async function getSummarizerStructure(provider) {
-    const res = await pool.query('SELECT * FROM summarizer_prompt_blocks WHERE provider = $1 ORDER BY position', [provider]);
-    return res.rows;
+    return await pool('summarizer_prompt_blocks').where('provider', provider).orderBy('position');
 }
 
 /**
@@ -295,24 +298,20 @@ async function getSummarizerStructure(provider) {
  * @param {Array<object>} blocks - The array of structure blocks.
  */
 async function setSummarizerStructure(provider, blocks) {
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
-        await client.query('DELETE FROM summarizer_prompt_blocks WHERE provider = $1', [provider]);
+    await pool.transaction(async trx => {
+        await trx('summarizer_prompt_blocks').where('provider', provider).del();
         for (let i = 0; i < blocks.length; i++) {
             const block = blocks[i];
-            await client.query(
-                'INSERT INTO summarizer_prompt_blocks (provider, name, role, content, position, is_enabled) VALUES ($1, $2, $3, $4, $5, $6)',
-                [provider, block.name, block.role, block.content, i, block.is_enabled]
-            );
+            await trx('summarizer_prompt_blocks').insert({
+                provider,
+                name: block.name,
+                role: block.role,
+                content: block.content,
+                position: i,
+                is_enabled: block.is_enabled
+            });
         }
-        await client.query('COMMIT');
-    } catch (e) {
-        await client.query('ROLLBACK');
-        throw e;
-    } finally {
-        client.release();
-    }
+    });
 }
 
 

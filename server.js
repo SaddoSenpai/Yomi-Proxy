@@ -17,8 +17,8 @@ const proxyController = require('./controllers/proxyController');
 const { securityMiddleware } = require('./middleware/security');
 
 // --- ADDED: For persistent database sessions ---
-const pgSession = require('connect-pg-simple')(session);
-const pool = require('./config/db'); // Your existing database pool
+const KnexSessionStore = require('connect-session-knex')(session);
+const db = require('./config/db'); // Your existing database pool
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -69,15 +69,16 @@ console.log(`[Router] Created DYNAMIC proxy endpoint: POST ${dynamicProxyRoute}`
 app.use(express.static('public'));
 
 // --- MODIFIED: Session middleware now uses the database ---
+const store = new KnexSessionStore({
+    knex: db,
+    tablename: 'sessions' // optional, defaults to 'sessions'
+});
+
 app.use(session({
-    store: new pgSession({
-        pool: pool,                // Connection pool
-        tableName: 'user_sessions' // Use a custom table name
-    }),
-    // IMPORTANT: Change this secret to a long, random string in your .env file
     secret: process.env.SESSION_SECRET || 'yomi-proxy-secret-key-change-me',
     resave: false,
-    saveUninitialized: false, // Set to false for best practice
+    saveUninitialized: false,
+    store: store,
     cookie: {
         secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
         maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
@@ -91,6 +92,14 @@ app.use('/admin', adminRoutes);
 // --- Application Startup ---
 async function startServer() {
     console.log('--- Yomi Proxy Starting Up ---');
+
+    // If using SQLite, run migrations first
+    if (db.client.config.client === 'sqlite3') {
+        console.log('[DB] SQLite detected, ensuring database schema is up to date...');
+        const { createTables } = require('./config/db-schema');
+        await createTables(db);
+        console.log('[DB] Database schema check complete.');
+    }
     
     // Initialize managers that load data into memory
     await tokenManager.initialize();
