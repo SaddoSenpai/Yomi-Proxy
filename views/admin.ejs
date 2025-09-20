@@ -19,13 +19,11 @@
         <ul class="nav-links">
             <li><a href="#" class="nav-link active" data-tab="dashboard"><i class='bx bx-grid-alt'></i><span class="link_name">Dashboard</span></a></li>
             <li><a href="#" class="nav-link" data-tab="structure"><i class='bx bx-list-ul'></i><span class="link_name">Structure</span></a></li>
-            <!-- NEW: Summarizer Tab Link -->
             <li><a href="#" class="nav-link" data-tab="summarizer"><i class='bx bx-book-content'></i><span class="link_name">Summarizer</span></a></li>
             <li><a href="#" class="nav-link" data-tab="commands"><i class='bx bx-terminal'></i><span class="link_name">Commands</span></a></li>
             <li><a href="#" class="nav-link" data-tab="tokens"><i class='bx bx-key'></i><span class="link_name">User Tokens</span></a></li>
             <li><a href="#" class="nav-link" data-tab="custom-providers"><i class='bx bx-extension'></i><span class="link_name">Custom Providers</span></a></li>
             <li><a href="#" class="nav-link" data-tab="logs"><i class='bx bx-history'></i><span class="link_name">Logs</span></a></li>
-            <!-- NEW: Announce Tab Link -->
             <li><a href="#" class="nav-link" data-tab="announce"><i class='bx bxs-megaphone'></i><span class="link_name">Announce</span></a></li>
             <li><a href="#" class="nav-link" data-tab="import-export"><i class='bx bx-transfer-alt'></i><span class="link_name">Import/Export</span></a></li>
             <li class="logout-link"><a href="/admin/logout"><i class='bx bx-log-out'></i><span class="link_name">Logout</span></a></li>
@@ -61,6 +59,15 @@
                         <p id="stat-server-time" style="font-size: 1.8em; line-height: 1.4;">Loading...</p>
                     </div>
                 </div>
+
+                <!-- NEW: Server Actions Card -->
+                <div class="stat-card" style="margin-top: 20px;">
+                    <h3>Server Actions</h3>
+                    <p class="muted" style="font-size: 1rem; margin-bottom: 15px;">
+                        Manually trigger server-side processes. This is useful for refreshing data without restarting the application.
+                    </p>
+                    <button id="recheckKeysBtn" class="btn-primary">Re-check All API Keys</button>
+                </div>
             </div>
 
             <!-- Structure Tab -->
@@ -85,7 +92,7 @@
                 </div>
             </div>
 
-            <!-- NEW: Summarizer Tab -->
+            <!-- Summarizer Tab -->
             <div id="summarizer" class="tab-content">
                 <div class="content-header">
                     <h2>Summarizer Prompt Structure</h2>
@@ -330,7 +337,7 @@
                 </div>
             </div>
 
-            <!-- NEW: Announce Tab -->
+            <!-- Announce Tab -->
             <div id="announce" class="tab-content">
                 <div class="content-header">
                     <h2>Global Announcement</h2>

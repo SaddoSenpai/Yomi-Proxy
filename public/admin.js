@@ -107,6 +107,27 @@ document.addEventListener('DOMContentLoaded', () => {
     startServerClock();
     setInterval(fetchStats, 5000);
 
+    // --- NEW: Dashboard Actions ---
+    const recheckKeysBtn = document.getElementById('recheckKeysBtn');
+    recheckKeysBtn.addEventListener('click', async () => {
+        if (!confirm('This will test all API keys against their respective services. Continue?')) {
+            return;
+        }
+
+        recheckKeysBtn.disabled = true;
+        recheckKeysBtn.textContent = 'Checking...';
+
+        try {
+            const result = await api('/recheck-keys', { method: 'POST' });
+            showAlert(result.message);
+        } catch (error) {
+            showAlert('Failed to re-check keys: ' + error.message, true);
+        } finally {
+            recheckKeysBtn.disabled = false;
+            recheckKeysBtn.textContent = 'Re-check All API Keys';
+        }
+    });
+
     // --- Structure Editor ---
     const providerSelector = document.getElementById('providerSelector');
     const blocksList = document.getElementById('blocksList');
@@ -779,7 +800,7 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchLogSettings();
     });
     
-    // --- NEW: Announcement Tab Logic ---
+    // --- Announcement Tab Logic ---
     const announcementForm = document.getElementById('announcement-form');
 
     async function fetchAnnouncement() {

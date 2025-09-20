@@ -23,6 +23,7 @@ router.use('/api', adminAuth);
 // --- Admin API Endpoints (Now automatically protected by the line above) ---
 router.get('/api/stats', adminController.getStats);
 router.get('/api/server-time', adminController.getServerTime);
+router.post('/api/recheck-keys', adminController.recheckApiKeys); // <-- NEW ROUTE
 
 // Structure
 router.get('/api/structure', adminController.getStructure);

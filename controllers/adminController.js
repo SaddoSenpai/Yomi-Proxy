@@ -38,9 +38,20 @@ exports.getServerTime = (req, res) => {
     res.json({ serverTime: new Date().toISOString() });
 };
 
+// --- NEW: API for re-checking keys ---
+exports.recheckApiKeys = async (req, res) => {
+    try {
+        console.log('[Admin Action] User triggered a manual re-check of all API keys.');
+        await keyManager.checkAllKeys();
+        res.json({ success: true, message: 'All API keys have been re-validated successfully.' });
+    } catch (error) {
+        console.error('[Admin Action] Failed to re-check API keys:', error);
+        res.status(500).json({ error: 'An error occurred during key validation.', detail: error.message });
+    }
+};
+
 // --- API: Announcement ---
 exports.getAnnouncement = async (req, res) => {
-    // --- ADDED: Logging ---
     console.log('[adminController] Reached getAnnouncement function successfully.');
     try {
         const result = await pool.query("SELECT key, value FROM app_config WHERE key IN ('announcement_message', 'announcement_enabled')");
@@ -59,7 +70,6 @@ exports.getAnnouncement = async (req, res) => {
 };
 
 exports.updateAnnouncement = async (req, res) => {
-    // --- ADDED: Logging ---
     console.log('[adminController] Reached updateAnnouncement function successfully.');
     const { message, enabled } = req.body;
     const client = await pool.connect();
