@@ -54,8 +54,8 @@ exports.recheckApiKeys = async (req, res) => {
 exports.getAnnouncement = async (req, res) => {
     console.log('[adminController] Reached getAnnouncement function successfully.');
     try {
-        const result = await pool.query("SELECT key, value FROM app_config WHERE key IN ('announcement_message', 'announcement_enabled')");
-        const announcement = result.rows.reduce((acc, row) => {
+        const rows = await pool('app_config').whereIn('key', ['announcement_message', 'announcement_enabled']).select('key', 'value');
+        const announcement = rows.reduce((acc, row) => {
             acc[row.key] = row.value;
             return acc;
         }, {});
@@ -72,19 +72,15 @@ exports.getAnnouncement = async (req, res) => {
 exports.updateAnnouncement = async (req, res) => {
     console.log('[adminController] Reached updateAnnouncement function successfully.');
     const { message, enabled } = req.body;
-    const client = await pool.connect();
     try {
-        await client.query('BEGIN');
-        await client.query("UPDATE app_config SET value = $1 WHERE key = 'announcement_message'", [message]);
-        await client.query("UPDATE app_config SET value = $1 WHERE key = 'announcement_enabled'", [enabled]);
-        await client.query('COMMIT');
+        await pool.transaction(async trx => {
+            await trx('app_config').where('key', 'announcement_message').update({ value: message });
+            await trx('app_config').where('key', 'announcement_enabled').update({ value: enabled });
+        });
         res.json({ success: true, message: 'Announcement updated successfully.' });
     } catch (error) {
         console.error('[adminController] Error updating announcement:', error);
-        await client.query('ROLLBACK');
         res.status(500).json({ error: 'Failed to update announcement.' });
-    } finally {
-        client.release();
     }
 };
 
@@ -333,7 +329,6 @@ exports.importData = async (req, res) => {
         return res.status(400).json({ error: 'No file uploaded.' });
     }
 
-    const client = await pool.connect();
     try {
         const file = req.files.configFile;
         const importData = JSON.parse(file.data.toString('utf8'));
@@ -343,37 +338,48 @@ exports.importData = async (req, res) => {
             throw new Error('Invalid import file format. Missing "structure" or "commands" array.');
         }
 
-        await client.query('BEGIN');
-        
-        await client.query('DELETE FROM global_prompt_blocks WHERE provider = $1', [targetProvider]);
-        for (let i = 0; i < structure.length; i++) {
-            const block = structure[i];
-            await client.query(
-                'INSERT INTO global_prompt_blocks (provider, name, role, content, position, is_enabled, block_type) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-                [targetProvider, block.name, block.role, block.content, i, block.is_enabled, block.block_type]
-            );
-        }
-        
-        for (const cmd of commands) {
-            await client.query(
-                `INSERT INTO commands (command_tag, block_name, block_role, block_content, command_type)
-                 VALUES ($1, $2, $3, $4, $5)
-                 ON CONFLICT (command_tag) DO UPDATE SET
-                    block_name = EXCLUDED.block_name,
-                    block_role = EXCLUDED.block_role,
-                    block_content = EXCLUDED.block_content,
-                    command_type = EXCLUDED.command_type,
-                    updated_at = NOW()`,
-                [cmd.command_tag.toUpperCase(), cmd.block_name, cmd.block_role, cmd.block_content, cmd.command_type]
-            );
-        }
-        
-        await client.query('COMMIT');
+        await pool.transaction(async trx => {
+            await trx('global_prompt_blocks').where('provider', targetProvider).del();
+
+            for (let i = 0; i < structure.length; i++) {
+                const block = structure[i];
+                await trx('global_prompt_blocks').insert({
+                    provider: targetProvider,
+                    name: block.name,
+                    role: block.role,
+                    content: block.content,
+                    position: i,
+                    is_enabled: block.is_enabled,
+                    block_type: block.block_type
+                });
+            }
+
+            for (const cmd of commands) {
+                const commandTag = cmd.command_tag.toUpperCase();
+                const existing = await trx('commands').where('command_tag', commandTag).first();
+
+                if (existing) {
+                    await trx('commands').where('command_tag', commandTag).update({
+                        block_name: cmd.block_name,
+                        block_role: cmd.block_role,
+                        block_content: cmd.block_content,
+                        command_type: cmd.command_type,
+                        updated_at: pool.fn.now()
+                    });
+                } else {
+                    await trx('commands').insert({
+                        command_tag: commandTag,
+                        block_name: cmd.block_name,
+                        block_role: cmd.block_role,
+                        block_content: cmd.block_content,
+                        command_type: cmd.command_type
+                    });
+                }
+            }
+        });
+
         res.json({ success: true, message: `Successfully imported config to provider '${targetProvider}'.` });
     } catch (error) {
-        await client.query('ROLLBACK');
         res.status(500).json({ error: 'Import failed.', detail: error.message });
-    } finally {
-        client.release();
     }
 };

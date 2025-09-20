@@ -19,11 +19,11 @@ exports.renderMainPage = async (req, res) => {
 
         // --- NEW: Fetch announcement ---
         let announcementMessage = null;
-        const result = await pool.query("SELECT value FROM app_config WHERE key = 'announcement_enabled'");
-        if (result.rows.length > 0 && result.rows[0].value === 'true') {
-            const messageResult = await pool.query("SELECT value FROM app_config WHERE key = 'announcement_message'");
-            if (messageResult.rows.length > 0) {
-                announcementMessage = messageResult.rows[0].value;
+        const announcementEnabled = await pool('app_config').where('key', 'announcement_enabled').select('value').first();
+        if (announcementEnabled && announcementEnabled.value === 'true') {
+            const messageResult = await pool('app_config').where('key', 'announcement_message').select('value').first();
+            if (messageResult) {
+                announcementMessage = messageResult.value;
             }
         }
 

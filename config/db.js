@@ -1,20 +1,37 @@
 // config/db.js
-// Sets up and exports the connection pool for the Supabase (PostgreSQL) database.
+// Sets up and exports the database connection using Knex.
+// Supports both Supabase (PostgreSQL) and a local SQLite database.
 
-const { Pool } = require('pg');
+const knex = require('knex');
+const path = require('path');
 
-// Check if the DATABASE_URL is provided in the environment variables
-if (!process.env.DATABASE_URL) {
-    throw new Error('FATAL: DATABASE_URL is not defined in the .env file.');
+let db;
+
+if (process.env.DATABASE_URL) {
+    // Use PostgreSQL if DATABASE_URL is provided
+    console.log('DATABASE_URL provided, connecting to PostgreSQL...');
+    db = knex({
+        client: 'pg',
+        connection: {
+            connectionString: process.env.DATABASE_URL,
+            ssl: { rejectUnauthorized: false }
+        },
+        pool: {
+            min: 2,
+            max: 10
+        }
+    });
+} else {
+    // Use SQLite for local development if no DATABASE_URL is set
+    console.log('DATABASE_URL not found, falling back to local SQLite database...');
+    const dbPath = path.join(__dirname, '..', 'yomi-proxy.db');
+    db = knex({
+        client: 'sqlite3',
+        connection: {
+            filename: dbPath
+        },
+        useNullAsDefault: true
+    });
 }
 
-// Create a new connection pool
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  // Use SSL for production connections to Supabase
-  ssl: {
-    rejectUnauthorized: false
-  }
-});
-
-module.exports = pool;
+module.exports = db;

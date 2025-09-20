@@ -45,11 +45,15 @@ async function createLogEntry(reqId, provider, tokenName, requestPayload, charac
     if (state.mode === 'disabled') return;
 
     try {
-        await pool.query(
-            `INSERT INTO request_logs (request_id, provider, token_name, request_payload, status_code, character_name, detected_commands) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [reqId, provider, tokenName, requestPayload, 0, characterName, detectedCommands] // 0 for pending
-        );
+        await pool('request_logs').insert({
+            request_id: reqId,
+            provider,
+            token_name: tokenName,
+            request_payload: requestPayload,
+            status_code: 0, // 0 for pending
+            character_name: characterName,
+            detected_commands: detectedCommands
+        });
     } catch (error) {
         console.error(`[Log Service] Failed to create log entry for request ${reqId}.`, error);
     }
@@ -65,11 +69,10 @@ async function updateLogEntry(reqId, statusCode, responsePayload) {
     if (state.mode === 'disabled') return;
 
     try {
-        await pool.query(
-            `UPDATE request_logs SET status_code = $1, response_payload = $2 
-             WHERE request_id = $3`,
-            [statusCode, responsePayload, reqId]
-        );
+        await pool('request_logs').where('request_id', reqId).update({
+            status_code: statusCode,
+            response_payload: responsePayload
+        });
     } catch (error) {
         console.error(`[Log Service] Failed to update log entry for request ${reqId}.`, error);
     }
@@ -82,14 +85,15 @@ async function updateLogEntry(reqId, statusCode, responsePayload) {
  */
 async function getLogs(page = 1, limit = 20) {
     const offset = (page - 1) * limit;
-    const logsResult = await pool.query(
-        'SELECT id, request_id, provider, token_name, status_code, created_at, character_name, detected_commands FROM request_logs ORDER BY created_at DESC LIMIT $1 OFFSET $2',
-        [limit, offset]
-    );
-    const totalResult = await pool.query('SELECT COUNT(*) FROM request_logs');
+    const logs = await pool('request_logs')
+        .select('id', 'request_id', 'provider', 'token_name', 'status_code', 'created_at', 'character_name', 'detected_commands')
+        .orderBy('created_at', 'desc')
+        .limit(limit)
+        .offset(offset);
+    const totalResult = await pool('request_logs').count('* as count').first();
     return {
-        logs: logsResult.rows,
-        total: parseInt(totalResult.rows[0].count, 10)
+        logs,
+        total: parseInt(totalResult.count, 10)
     };
 }
 
@@ -98,8 +102,7 @@ async function getLogs(page = 1, limit = 20) {
  * @param {number} id - The database ID of the log.
  */
 async function getLogDetails(id) {
-    const result = await pool.query('SELECT * FROM request_logs WHERE id = $1', [id]);
-    return result.rows[0];
+    return await pool('request_logs').where('id', id).first();
 }
 
 /**
@@ -107,23 +110,23 @@ async function getLogDetails(id) {
  * @param {number} id - The database ID of the log.
  */
 async function deleteLog(id) {
-    await pool.query('DELETE FROM request_logs WHERE id = $1', [id]);
+    await pool('request_logs').where('id', id).del();
 }
 
 /**
  * Deletes all logs from the database.
  */
 async function deleteAllLogs() {
-    await pool.query('TRUNCATE TABLE request_logs');
+    await pool('request_logs').truncate();
 }
 
 /**
  * Fetches the current logging settings from the database.
  */
 async function getLogSettings() {
-    const result = await pool.query('SELECT key, value FROM app_config WHERE key LIKE \'logging_%\'');
+    const rows = await pool('app_config').where('key', 'like', 'logging_%');
     const settings = {};
-    result.rows.forEach(row => {
+    rows.forEach(row => {
         settings[row.key] = row.value;
     });
     return settings;
@@ -135,12 +138,11 @@ async function getLogSettings() {
  * @param {number} purgeHours - The new number of hours for auto-purge.
  */
 async function updateLogSettings(mode, purgeHours) {
-    const client = await pool.connect();
     try {
-        await client.query('BEGIN');
-        await client.query('UPDATE app_config SET value = $1 WHERE key = \'logging_mode\'', [mode]);
-        await client.query('UPDATE app_config SET value = $1 WHERE key = \'logging_purge_hours\'', [purgeHours]);
-        await client.query('COMMIT');
+        await pool.transaction(async trx => {
+            await trx('app_config').where('key', 'logging_mode').update({ value: mode });
+            await trx('app_config').where('key', 'logging_purge_hours').update({ value: purgeHours });
+        });
 
         // Update in-memory state
         state.mode = mode;
@@ -153,11 +155,8 @@ async function updateLogSettings(mode, purgeHours) {
         }
         console.log(`[Log Service] Settings updated. Mode: ${state.mode}, Purge Hours: ${state.purgeHours}`);
     } catch (error) {
-        await client.query('ROLLBACK');
         console.error('[Log Service] Failed to update settings.', error);
         throw error;
-    } finally {
-        client.release();
     }
 }
 
@@ -168,11 +167,11 @@ async function purgeOldLogs() {
     if (state.mode !== 'auto_purge') return;
     console.log('[Log Service] Running scheduled log purge...');
     try {
-        const result = await pool.query(
-            `DELETE FROM request_logs WHERE created_at < NOW() - INTERVAL '${state.purgeHours} hours'`
-        );
-        if (result.rowCount > 0) {
-            console.log(`[Log Service] Purged ${result.rowCount} old log(s).`);
+        const count = await pool('request_logs')
+            .where('created_at', '<', pool.raw(`NOW() - INTERVAL '${state.purgeHours} hours'`))
+            .del();
+        if (count > 0) {
+            console.log(`[Log Service] Purged ${count} old log(s).`);
         }
     } catch (error) {
         console.error('[Log Service] Error during scheduled log purge.', error);
